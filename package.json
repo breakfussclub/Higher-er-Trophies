@@ -1,14 +1,14 @@
 {
-  "name": "gaming-tracker-bot",
+  "name": "higher-er-trophies-bot",
   "version": "1.0.0",
-  "description": "Discord bot to track PSN, Steam, and Xbox Live stats",
+  "description": "Higher-er Trophies - Discord bot to track PSN, Steam, and Xbox Live stats",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js"
   },
-  "keywords": ["discord", "bot", "gaming", "psn", "steam", "xbox"],
+  "keywords": ["discord", "bot", "gaming", "psn", "steam", "xbox", "trophies"],
   "author": "",
   "license": "MIT",
   "dependencies": {

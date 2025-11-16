@@ -1,0 +1,19 @@
+{
+  "name": "gaming-tracker-bot",
+  "version": "1.0.0",
+  "description": "Discord bot to track PSN, Steam, and Xbox Live stats",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "keywords": ["discord", "bot", "gaming", "psn", "steam", "xbox"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^3.3.2"
+  }
+}

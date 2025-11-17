@@ -84,9 +84,13 @@ export default {
     // Fetch Xbox stats
     if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
       try {
-        const xboxFields = await getXboxStats(userData.xbox);
-        if (xboxFields && xboxFields.length > 0) {
-          embed.addFields(xboxFields);
+        const xboxStats = await getXboxStats(userData.xbox);
+        if (xboxStats.fields && xboxStats.fields.length > 0) {
+          // Apply Xbox embed styling if it's the only platform or first platform
+          if (xboxStats.color && !hasAnyStats) embed.setColor(xboxStats.color);
+          if (xboxStats.author && !hasAnyStats) embed.setAuthor(xboxStats.author);
+          if (xboxStats.thumbnail && !hasAnyStats) embed.setThumbnail(xboxStats.thumbnail);
+          embed.addFields(xboxStats.fields);
           hasAnyStats = true;
         }
       } catch (error) {

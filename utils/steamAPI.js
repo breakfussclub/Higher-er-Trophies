@@ -41,3 +41,4 @@ export async function getSteamLevel(steamId) {
   const data = await response.json();
   return data.response;
 }
+

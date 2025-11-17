@@ -35,10 +35,8 @@ export default {
       });
     }
 
-    // Create embed but DO NOT set color/author/thumbnail yet
     const embed = new EmbedBuilder().setTimestamp();
 
-    // Steam Stats: set color, author, and thumbnail from stats object
     if ((platform === 'all' || platform === 'steam') && userData.steam) {
       const steamStats = await getSteamStats(userData.steam);
       if (steamStats.color) embed.setColor(steamStats.color);
@@ -46,20 +44,21 @@ export default {
       if (steamStats.thumbnail) embed.setThumbnail(steamStats.thumbnail);
       embed.addFields(steamStats.fields);
     } else {
-      embed.setColor(0x5865F2);
+      embed.setColor(0x5865f2);
       embed.setAuthor({
         name: `${targetUser.username}'s Gaming Stats`,
         iconURL: targetUser.displayAvatarURL()
       });
     }
 
-    // PSN Stats
     if ((platform === 'all' || platform === 'psn') && userData.psn) {
-      const psnFields = await getPSNStats(userData.psn);
-      embed.addFields(psnFields);
+      const psnStats = await getPSNStats(userData.psn);
+      if (psnStats.color) embed.setColor(psnStats.color);
+      if (psnStats.author) embed.setAuthor(psnStats.author);
+      if (psnStats.thumbnail) embed.setThumbnail(psnStats.thumbnail);
+      embed.addFields(psnStats.fields);
     }
 
-    // Xbox Stats
     if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
       const xboxFields = await getXboxStats(userData.xbox);
       embed.addFields(xboxFields);

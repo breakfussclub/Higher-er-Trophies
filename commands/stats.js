@@ -43,19 +43,17 @@ export default {
       })
       .setTimestamp();
 
-    // Steam Stats
     if ((platform === 'all' || platform === 'steam') && userData.steam) {
-      const steamFields = await getSteamStats(userData.steam);
-      embed.addFields(steamFields);
+      const steamStats = await getSteamStats(userData.steam);
+      if (steamStats.thumbnail) embed.setThumbnail(steamStats.thumbnail);
+      embed.addFields(steamStats.fields);
     }
 
-    // PSN Stats
     if ((platform === 'all' || platform === 'psn') && userData.psn) {
       const psnFields = await getPSNStats(userData.psn);
       embed.addFields(psnFields);
     }
 
-    // Xbox Stats
     if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
       const xboxFields = await getXboxStats(userData.xbox);
       embed.addFields(xboxFields);

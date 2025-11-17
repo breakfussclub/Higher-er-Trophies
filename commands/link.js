@@ -18,7 +18,7 @@ export default {
         ))
     .addStringOption(option =>
       option.setName('username')
-        .setDescription('Your username/ID on the platform. For PSN, use "me" for your own account.')
+        .setDescription('Your username/ID on the platform')
         .setRequired(true)),
 
   async execute(interaction) {
@@ -52,23 +52,14 @@ export default {
         }
       }
 
-      // For PSN, fetch the profile to get the authenticated user's data
+      // For PSN, fetch the profile using exact Online ID lookup
       if (platform === 'psn') {
         try {
           console.log(`\n=== LINKING PSN ACCOUNT ===`);
           console.log(`User input: "${username}"`);
           
-          // IMPORTANT: PSN's search API has a quirk:
-          // If you search for your own username, it won't return in results
-          // Instead, use "me" to refer to the authenticated user
-          let searchTerm = username;
-          if (username.toLowerCase() === 'me' || username.toLowerCase() === 'self') {
-            searchTerm = 'me';
-            console.log(`Using special identifier: "me" for authenticated user`);
-          }
-          
-          // Fetch the profile
-          const profile = await getPSNProfile(searchTerm);
+          // Fetch the profile (now using exact lookup!)
+          const profile = await getPSNProfile(username);
           
           console.log(`✅ Profile found - Online ID: "${profile.onlineId}"`);
           console.log(`Trophy Level: ${profile.trophyLevel}`);
@@ -83,7 +74,7 @@ export default {
         } catch (error) {
           console.error(`❌ PSN linking failed:`, error.message);
           return await interaction.editReply({
-            content: `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n\n**Tips:**\n• If searching for yourself, use: \`/link psn me\`\n• PSN's search has a quirk: your own username won't show in search results\n• Use "me" for your authenticated account\n• For other users, enter their exact PSN Online ID\n• Make sure their profile is **public** and **trophies visible to "Anyone"**`,
+            content: `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n\n**Please verify:**\n• Your PSN Online ID is spelled correctly\n• Your PSN profile is **public**\n• Your trophies are visible to **"Anyone"**`,
             ephemeral: true
           });
         }

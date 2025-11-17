@@ -56,7 +56,7 @@ export async function getSteamStats(steamId) {
         const badgeUrl = getBadgeIcon(latestBadge.appid, latestBadge.icon);
         latestBadgeField = {
           name: '🏅 Latest Badge',
-          value: `![badge](${badgeUrl}) Level ${latestBadge.level ?? ''}`.trim(),
+          value: `[Level ${latestBadge.level ?? ''}](${badgeUrl})`,
           inline: true
         };
       }
@@ -85,17 +85,14 @@ export async function getSteamStats(steamId) {
       }
     }
 
-    // Section separator
-    const sep = '––––––––––––––––––––––';
-
     // Recent activity (with game icons and playtime)
     let recentActivityDisplay = '';
     if (recentGames?.games?.length) {
-      recentActivityDisplay = recentGames.games
+      recentActivityDisplay = '**Recent Activity**\n' + recentGames.games
         .map(g => {
           const gameIcon = getGameIcon(g.appid, g.img_icon_url);
           const time = Math.floor(g.playtime_2weeks / 60);
-          return `![icon](${gameIcon}) [${g.name}](https://store.steampowered.com/app/${g.appid}/) — ${time} hrs (2w)`;
+          return `[${g.name}](https://store.steampowered.com/app/${g.appid}/) — ${time} hrs (2w)`;
         })
         .join('\n');
     }
@@ -106,10 +103,9 @@ export async function getSteamStats(steamId) {
       { name: 'Playtime', value: `🕒 ${totalPlaytime} hrs`, inline: true },
       { name: 'Badges', value: `🏅 ${badgesData?.badges?.length ?? 'N/A'}`, inline: true },
       ...(latestBadgeField ? [latestBadgeField] : []),
-      { name: sep, value: sep, inline: false },
       mostPlayedGame && {
-        name: 'Most Played Game',
-        value: `![icon](${mostPlayedIcon}) [${mostPlayedGame.name}](https://store.steampowered.com/app/${mostPlayedGame.appid}/) — ${Math.floor(mostPlayedGame.playtime_forever / 60)} hrs`,
+        name: '**Most Played Game**',
+        value: `[${mostPlayedGame.name}](https://store.steampowered.com/app/${mostPlayedGame.appid}/) — ${Math.floor(mostPlayedGame.playtime_forever / 60)} hrs`,
         inline: false
       },
       recentActivityDisplay && {
@@ -117,10 +113,16 @@ export async function getSteamStats(steamId) {
         value: recentActivityDisplay,
         inline: false
       },
-      { name: sep, value: sep, inline: false },
-      { name: 'Latest Achievements', value: achievementDisplay, inline: false },
-      { name: sep, value: sep, inline: false },
-      { name: 'Status', value: getStatusEmoji(steamProfile.personastate), inline: true }
+      {
+        name: '**Latest Achievements**',
+        value: achievementDisplay,
+        inline: false
+      },
+      {
+        name: 'Status',
+        value: getStatusEmoji(steamProfile.personastate),
+        inline: true
+      }
     ].filter(Boolean);
 
     return {

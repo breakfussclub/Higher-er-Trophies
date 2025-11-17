@@ -27,15 +27,11 @@ function getTierEmoji(tier) {
 
 export async function getPSNStats(onlineIdOrAccountId) {
   try {
-    console.log(`Fetching PSN stats for: ${onlineIdOrAccountId}`);
+    console.log(`=== FETCHING PSN STATS FOR: ${onlineIdOrAccountId} ===`);
     const profile = await getPSNProfile(onlineIdOrAccountId);
     
-    console.log('PSN Profile Data:', {
-      onlineId: profile.onlineId,
-      accountId: profile.accountId,
-      trophyLevel: profile.trophyLevel,
-      trophies: profile.earnedTrophies
-    });
+    console.log('=== COMPLETE PROFILE DATA ===');
+    console.log(JSON.stringify(profile, null, 2));
     
     // Dynamic embed color based on trophy level
     let embedColor = 0x003087; // PSN Blue default
@@ -51,7 +47,13 @@ export async function getPSNStats(onlineIdOrAccountId) {
       profile.earnedTrophies.gold + 
       profile.earnedTrophies.platinum;
 
-    console.log(`Total trophies calculated: ${totalTrophies}`);
+    console.log(`=== TROPHY BREAKDOWN ===`);
+    console.log(`Platinum: ${profile.earnedTrophies.platinum}`);
+    console.log(`Gold: ${profile.earnedTrophies.gold}`);
+    console.log(`Silver: ${profile.earnedTrophies.silver}`);
+    console.log(`Bronze: ${profile.earnedTrophies.bronze}`);
+    console.log(`TOTAL: ${totalTrophies}`);
+    console.log(`Avatar URL: ${profile.avatarUrl}`);
 
     const fields = [
       { 

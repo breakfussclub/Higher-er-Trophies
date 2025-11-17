@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { linkAccount, getUser } from '../utils/userData.js';
 import { resolveVanityUrl, getSteamProfile } from '../utils/steamAPI.js';
-import { getPSNAccountId } from '../utils/psnAPI.js';
+import { getPSNAccountId, getPSNProfile } from '../utils/psnAPI.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -54,18 +54,17 @@ export default {
         }
       }
 
-      // For PSN, validate and convert Online ID to Account ID if needed
+      // For PSN, validate but STORE THE ONLINE ID (not Account ID)
       if (platform === 'psn') {
         try {
-          // Check if it's already an account ID (numeric)
-          if (/^\d+$/.test(username)) {
-            accountId = username;
-            displayName = username; // We'll use the account ID as display
-          } else {
-            // It's an Online ID, need to convert to Account ID
-            accountId = await getPSNAccountId(username);
-            displayName = username; // Keep the Online ID for display
-          }
+          // Validate the username exists by fetching profile
+          const profile = await getPSNProfile(username);
+          
+          // Store the Online ID (username), NOT the numeric Account ID
+          accountId = profile.onlineId; // This is the username like "Breakfuss"
+          displayName = profile.onlineId;
+          
+          console.log(`PSN Link - Storing Online ID: ${accountId}`);
         } catch (error) {
           return await interaction.editReply({
             content: `❌ Could not find PSN account "${username}". Please check:\n• Username is spelled correctly\n• Profile privacy is set to public\n• Trophies are visible to "Anyone"\n\nError: ${error.message}`,
@@ -89,8 +88,7 @@ export default {
         .setDescription(`Your **${platform.toUpperCase()}** account has been linked!`)
         .addFields(
           { name: 'Platform', value: platform.toUpperCase(), inline: true },
-          { name: 'Username', value: displayName, inline: true },
-          { name: 'Account ID', value: accountId, inline: true }
+          { name: 'Username', value: displayName, inline: true }
         )
         .setFooter({ text: 'Use /stats to view your gaming stats!' })
         .setTimestamp();

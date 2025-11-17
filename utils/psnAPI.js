@@ -74,13 +74,13 @@ export async function getPSNAccountId(onlineId) {
     const authorization = await getAuthorization();
     
     console.log(`Looking up exact profile for Online ID: "${onlineId}"`);
-    const profile = await getProfileFromUserName(authorization, onlineId);
+    const response = await getProfileFromUserName(authorization, onlineId);
     
-    console.log('Full response from getProfileFromUserName:', JSON.stringify(profile, null, 2));
+    // FIX: The response structure has data nested in .profile
+    const profile = response.profile || response;
     
-    // FIX: Extract the correct properties from the response
-    const accountId = profile.accountId || profile.id;
-    const returnedOnlineId = profile.onlineId || profile.profileName || profile.userName || onlineId;
+    const accountId = profile.accountId;
+    const returnedOnlineId = profile.onlineId;
     
     console.log(`✅ Found exact match: "${returnedOnlineId}" (Account ID: ${accountId})`);
     

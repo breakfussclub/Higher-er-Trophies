@@ -18,10 +18,13 @@ async function openXBLRequest(endpoint) {
 
   if (!response.ok) {
     const error = await response.text();
+    console.error(`OpenXBL API error (${response.status}):`, error);
     throw new Error(`OpenXBL API error: ${response.status} - ${error}`);
   }
 
-  return await response.json();
+  const data = await response.json();
+  console.log('OpenXBL API response:', JSON.stringify(data, null, 2));
+  return data;
 }
 
 /**
@@ -30,12 +33,14 @@ async function openXBLRequest(endpoint) {
  * @returns {Promise<Object>} Search results with XUID
  */
 export async function searchGamertag(gamertag) {
+  console.log(`Searching for Xbox gamertag: ${gamertag}`);
   const data = await openXBLRequest(`/search/${encodeURIComponent(gamertag)}`);
 
   if (!data.people || data.people.length === 0) {
     throw new Error('Gamertag not found');
   }
 
+  console.log(`Found XUID: ${data.people[0].xuid} for gamertag: ${gamertag}`);
   return data.people[0]; // Return first match
 }
 
@@ -45,6 +50,7 @@ export async function searchGamertag(gamertag) {
  * @returns {Promise<Object>} Account information
  */
 export async function getXboxAccount(xuid) {
+  console.log(`Fetching Xbox account for XUID: ${xuid}`);
   const data = await openXBLRequest(`/account/${xuid}`);
   return data;
 }
@@ -63,6 +69,12 @@ export async function getXboxProfile(gamertag) {
     // Then get full account details
     const accountData = await getXboxAccount(xuid);
 
+    console.log('Xbox profile data:', {
+      xuid,
+      gamertag: accountData.gamertag,
+      gamerscore: accountData.gamerScore
+    });
+
     return {
       xuid: xuid,
       gamertag: accountData.gamertag || gamertag,
@@ -75,6 +87,7 @@ export async function getXboxProfile(gamertag) {
       realName: accountData.realName || null
     };
   } catch (error) {
+    console.error('Error in getXboxProfile:', error);
     throw new Error(`Failed to get Xbox profile: ${error.message}`);
   }
 }

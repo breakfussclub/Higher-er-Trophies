@@ -1,4 +1,4 @@
-import { getXboxProfile } from '../utils/xboxAPI.js';
+import { getXboxProfile, getXboxPresence, searchGamertag } from '../utils/xboxAPI.js';
 
 function getReputationDisplay(rep) {
   const repMap = {
@@ -21,12 +21,36 @@ function getTierDisplay(tier) {
   return tierMap[tier] || '⭐ Standard';
 }
 
+function formatTenure(tenure) {
+  if (!tenure) return null;
+  
+  // Tenure is typically in format like "Y4" for 4 years
+  const match = tenure.match(/Y(\d+)/);
+  if (match) {
+    const years = parseInt(match[1]);
+    if (years >= 10) return `🏆 ${years} Year Veteran`;
+    if (years >= 5) return `🎖️ ${years} Years`;
+    return `📅 ${years} Year${years !== 1 ? 's' : ''}`;
+  }
+  return null;
+}
+
 export async function getXboxStats(xboxGamertag) {
   try {
     console.log(`Fetching Xbox stats for: ${xboxGamertag}`);
     const xboxProfile = await getXboxProfile(xboxGamertag);
     
     console.log('Xbox profile received:', xboxProfile);
+
+    // Try to get presence/activity data
+    let presenceData = null;
+    try {
+      // Get search result which includes more details
+      const searchResult = await searchGamertag(xboxGamertag);
+      presenceData = searchResult;
+    } catch (err) {
+      console.log('Could not fetch Xbox presence:', err.message);
+    }
 
     // Format gamerscore with commas
     const formattedGamerscore = xboxProfile.gamerscore?.toLocaleString() || '0';
@@ -36,44 +60,114 @@ export async function getXboxStats(xboxGamertag) {
     if (xboxProfile.accountTier === 'Gold') embedColor = 0xFFD700; // Gold
     else if (xboxProfile.accountTier === 'Silver') embedColor = 0xC0C0C0; // Silver
 
+    // Build fields array
     const fields = [
       { 
+        name: '━━━━━━━━━━━━━━━━━━━━━',
+        value: '**Account Information**',
+        inline: false
+      },
+      { 
         name: '🎮 Gamertag', 
-        value: xboxProfile.gamertag || xboxGamertag, 
+        value: `\`${xboxProfile.gamertag || xboxGamertag}\``, 
         inline: true 
       },
       { 
         name: '🏆 Gamerscore', 
-        value: formattedGamerscore, 
-        inline: true 
-      },
-      { 
-        name: '\u200b', 
-        value: '\u200b', 
+        value: `**${formattedGamerscore}**`, 
         inline: true 
       },
       { 
         name: 'Account Tier', 
         value: getTierDisplay(xboxProfile.accountTier), 
         inline: true 
-      },
-      { 
-        name: 'Reputation', 
-        value: getReputationDisplay(xboxProfile.xboxOneRep), 
-        inline: true 
-      },
-      { 
-        name: '\u200b', 
-        value: '\u200b', 
-        inline: true 
       }
     ];
 
+    // Add follower counts if available
+    if (presenceData?.detail?.followerCount !== undefined || presenceData?.detail?.followingCount !== undefined) {
+      fields.push({ 
+        name: '👥 Followers', 
+        value: presenceData.detail.followerCount?.toString() || '0', 
+        inline: true 
+      });
+      fields.push({ 
+        name: '➕ Following', 
+        value: presenceData.detail.followingCount?.toString() || '0', 
+        inline: true 
+      });
+      fields.push({ 
+        name: '\u200b', 
+        value: '\u200b', 
+        inline: true 
+      });
+    }
+
+    // Add reputation and tenure section
+    fields.push({
+      name: '━━━━━━━━━━━━━━━━━━━━━',
+      value: '**Status & Reputation**',
+      inline: false
+    });
+
+    fields.push({ 
+      name: 'Reputation', 
+      value: getReputationDisplay(xboxProfile.xboxOneRep), 
+      inline: true 
+    });
+
+    // Add tenure if available
+    const tenureDisplay = formatTenure(presenceData?.detail?.tenure);
+    if (tenureDisplay) {
+      fields.push({ 
+        name: 'Xbox Tenure', 
+        value: tenureDisplay, 
+        inline: true 
+      });
+    }
+
+    // Add Game Pass status if available
+    if (presenceData?.detail?.hasGamePass !== undefined) {
+      fields.push({ 
+        name: 'Game Pass', 
+        value: presenceData.detail.hasGamePass ? '✅ Active' : '❌ Inactive', 
+        inline: true 
+      });
+    }
+
+    // Add presence/activity if available
+    if (presenceData?.presenceState || presenceData?.presenceText) {
+      fields.push({
+        name: '━━━━━━━━━━━━━━━━━━━━━',
+        value: '**Current Activity**',
+        inline: false
+      });
+
+      const statusEmojis = {
+        'Online': '🟢',
+        'Offline': '⚪',
+        'Away': '🟡',
+        'Busy': '🔴'
+      };
+
+      const statusEmoji = statusEmojis[presenceData.presenceState] || '❓';
+      fields.push({
+        name: `${statusEmoji} Status`,
+        value: presenceData.presenceText || presenceData.presenceState || 'Offline',
+        inline: false
+      });
+    }
+
     // Add bio if it exists
     if (xboxProfile.bio) {
+      fields.push({
+        name: '━━━━━━━━━━━━━━━━━━━━━',
+        value: '**Bio**',
+        inline: false
+      });
       fields.push({ 
-        name: '📝 Bio', 
-        value: xboxProfile.bio.substring(0, 1024), 
+        name: '\u200b',
+        value: `*"${xboxProfile.bio.substring(0, 1024)}"*`, 
         inline: false 
       });
     }
@@ -84,9 +178,13 @@ export async function getXboxStats(xboxGamertag) {
       color: embedColor,
       thumbnail: xboxProfile.profilePicture,
       author: {
-        name: xboxProfile.gamertag || xboxGamertag,
+        name: `${xboxProfile.gamertag || xboxGamertag} - Xbox Live`,
         iconURL: xboxProfile.profilePicture,
         url: `https://www.xbox.com/en-US/play/user/${xboxProfile.gamertag || xboxGamertag}`
+      },
+      footer: {
+        text: '🎮 Xbox Live • Powered by OpenXBL',
+        iconURL: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/200px-Xbox_one_logo.svg.png'
       },
       fields: fields
     };

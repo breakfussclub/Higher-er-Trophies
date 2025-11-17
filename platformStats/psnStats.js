@@ -1,9 +1,4 @@
-import { 
-  getPSNProfile, 
-  getPSNTrophySummary, 
-  getPSNRecentGames,
-  getPSNRecentTrophies 
-} from '../utils/psnAPI.js';
+import { getPSNProfile, getPSNTrophySummary } from '../utils/psnAPI.js';
 
 function getTrophyEmoji(type) {
   const emojis = {
@@ -17,51 +12,37 @@ function getTrophyEmoji(type) {
 
 export async function getPSNStats(psnOnlineId) {
   try {
-    const psnProfile = await getPSNProfile(psnOnlineId);
-    const trophySummary = await getPSNTrophySummary(psnOnlineId);
-    const recentTrophies = await getPSNRecentTrophies(psnOnlineId).catch(() => []);
+    const psnProfileResponse = await getPSNProfile(psnOnlineId);
+    const psnProfile = psnProfileResponse.profile; // Adjust based on your API response structure
 
-    // Dynamic color based on trophy level
+    const trophySummaryResponse = await getPSNTrophySummary(psnOnlineId);
+    const trophySummary = trophySummaryResponse.trophySummary; // Adjust as per actual data
+
+    // Dynamic embed color based on trophy level
     let embedColor = 0x003087; // PSN Blue default
-    if (trophySummary.trophyLevel >= 500) embedColor = 0xFFD700; // Gold
-    else if (trophySummary.trophyLevel >= 200) embedColor = 0xC0C0C0; // Silver
+    if (trophySummary?.level >= 500) embedColor = 0xFFD700; // Gold
+    else if (trophySummary?.level >= 200) embedColor = 0xC0C0C0; // Silver
 
-    // Format recent trophies
-    let recentTrophiesDisplay = '';
-    if (recentTrophies.length > 0) {
-      recentTrophiesDisplay = recentTrophies
-        .slice(0, 3)
-        .map(t => `${getTrophyEmoji(t.trophyType)} **${t.trophyName}** — ${t.trophyDetail || 'No description'}`)
-        .join('\n');
-    } else {
-      recentTrophiesDisplay = 'No recent trophies';
-    }
-
-    const embedFields = [
-      { name: 'PSN Level', value: `🎚️ ${trophySummary.trophyLevel ?? 'N/A'}`, inline: true },
-      { name: 'Platinum', value: `🏆 ${trophySummary.earnedTrophies?.platinum ?? 0}`, inline: true },
-      { name: 'Gold', value: `🥇 ${trophySummary.earnedTrophies?.gold ?? 0}`, inline: true },
-      { name: 'Silver', value: `🥈 ${trophySummary.earnedTrophies?.silver ?? 0}`, inline: true },
-      { name: 'Bronze', value: `🥉 ${trophySummary.earnedTrophies?.bronze ?? 0}`, inline: true },
-      { name: 'Total Trophies', value: `🏅 ${trophySummary.earnedTrophies?.total ?? 0}`, inline: true },
-      {
-        name: '**Recent Trophies**',
-        value: recentTrophiesDisplay,
-        inline: false
-      }
+    const fields = [
+      { name: 'PSN Online ID', value: psnProfile.onlineId || psnOnlineId, inline: true },
+      { name: 'PSN Level', value: `🎚️ ${trophySummary?.level ?? 'N/A'}`, inline: true },
+      { name: 'Platinum', value: `${getTrophyEmoji('platinum')} ${trophySummary?.earnedTrophies?.platinum ?? 0}`, inline: true },
+      { name: 'Gold', value: `${getTrophyEmoji('gold')} ${trophySummary?.earnedTrophies?.gold ?? 0}`, inline: true },
+      { name: 'Silver', value: `${getTrophyEmoji('silver')} ${trophySummary?.earnedTrophies?.silver ?? 0}`, inline: true },
+      { name: 'Bronze', value: `${getTrophyEmoji('bronze')} ${trophySummary?.earnedTrophies?.bronze ?? 0}`, inline: true },
+      { name: 'Total', value: `🏅 ${trophySummary?.earnedTrophies?.total ?? 0}`, inline: true }
     ];
 
     return {
-      thumbnail: psnProfile.avatarUrl || null,
+      thumbnail: psnProfile?.avatarUrl ?? null,
       author: {
-        name: psnProfile.onlineId,
-        iconURL: psnProfile.avatarUrl || undefined,
-        url: `https://psnprofiles.com/${psnProfile.onlineId}`
+        name: psnProfile?.onlineId ?? psnOnlineId,
+        iconURL: psnProfile?.avatarUrl ?? undefined,
+        url: `https://psnprofiles.com/${psnProfile?.onlineId ?? psnOnlineId}`,
       },
       color: embedColor,
-      fields: embedFields
+      fields
     };
-
   } catch (error) {
     console.error('Error fetching PSN stats:', error);
     return {

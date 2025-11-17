@@ -22,13 +22,11 @@ export default {
           { name: 'Xbox Live', value: 'xbox' },
           { name: 'All Platforms', value: 'all' }
         )),
-
   async execute(interaction) {
     await interaction.deferReply();
 
     const targetUser = interaction.options.getUser('user') || interaction.user;
     const platform = interaction.options.getString('platform') || 'all';
-
     const userData = getUser(targetUser.id);
 
     if (!userData || (!userData.steam && !userData.psn && !userData.xbox)) {
@@ -52,8 +50,11 @@ export default {
           const steamProfile = await getSteamProfile(userData.steam);
           const steamGames = await getSteamGames(userData.steam);
 
-          const totalPlaytime = steamGames.games?.reduce((sum, game) => 
-            sum + (game.playtime_forever || 0), 0) || 0;
+          // Logging Steam API responses
+          console.log('Steam profile:', steamProfile);
+          console.log('Steam games:', steamGames);
+
+          const totalPlaytime = steamGames.games?.reduce((sum, game) => sum + (game.playtime_forever || 0), 0) || 0;
           const hours = Math.floor(totalPlaytime / 60);
 
           embed.addFields({
@@ -69,7 +70,7 @@ export default {
         } catch (error) {
           embed.addFields({
             name: '🎮 Steam',
-            value: '⚠️ Could not fetch Steam data',
+            value: '⚠️ Could not fetch Steam data (profile may be private)',
             inline: false
           });
         }
@@ -81,8 +82,12 @@ export default {
           const psnProfile = await getPSNProfile(userData.psn);
           const trophies = await getPSNTrophySummary(psnProfile.accountId);
 
+          // Logging PSN API responses
+          console.log('PSN profile:', psnProfile);
+          console.log('PSN trophies:', trophies);
+
           embed.addFields({
-            name: '🎮 PlayStation Network',
+            name: '🏆 PlayStation Network',
             value: [
               `**Online ID:** ${userData.psn}`,
               `**Level:** ${trophies.trophyLevel || 'N/A'}`,
@@ -93,7 +98,7 @@ export default {
           });
         } catch (error) {
           embed.addFields({
-            name: '🎮 PlayStation Network',
+            name: '🏆 PlayStation Network',
             value: '⚠️ Could not fetch PSN data (profile may be private)',
             inline: false
           });
@@ -104,24 +109,24 @@ export default {
       if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
         try {
           const xboxProfile = await getXboxProfile(userData.xbox);
-          const settings = xboxProfile.profileUsers?.[0]?.settings || [];
 
-          const gamertag = settings.find(s => s.id === 'Gamertag')?.value || userData.xbox;
-          const gamerscore = settings.find(s => s.id === 'Gamerscore')?.value || 'N/A';
+          // Logging OpenXBL API responses
+          console.log('Xbox profile:', xboxProfile);
 
           embed.addFields({
-            name: '🎮 Xbox Live',
+            name: '🎯 Xbox Live',
             value: [
-              `**Gamertag:** ${gamertag}`,
-              `**Gamerscore:** ${gamerscore}`,
-              `**Account Tier:** ${settings.find(s => s.id === 'AccountTier')?.value || 'N/A'}`
+              `**Gamertag:** ${xboxProfile.gamertag ?? 'Unknown'}`,
+              `**Gamerscore:** ${xboxProfile.gamerScore ?? 'Unknown'}`,
+              `**Account Tier:** ${xboxProfile.accountTier ?? 'Unknown'}`,
+              `**Xbox Rep:** ${xboxProfile.XboxOneRep ?? 'Unknown'}`
             ].join('\n'),
             inline: false
           });
         } catch (error) {
           embed.addFields({
-            name: '🎮 Xbox Live',
-            value: '⚠️ Could not fetch Xbox data',
+            name: '🎯 Xbox Live',
+            value: '⚠️ Could not fetch Xbox data (profile may be private or not found)',
             inline: false
           });
         }

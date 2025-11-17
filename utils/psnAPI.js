@@ -1,165 +1,156 @@
-import fetch from 'node-fetch';
+import {
+  exchangeNpssoForAccessCode,
+  exchangeAccessCodeForAuthTokens,
+  exchangeRefreshTokenForAuthTokens,
+  makeUniversalSearch,
+  getUserTrophyProfileSummary
+} from 'psn-api';
 
-const NPSSO = process.env.NPSSO;
+// Store auth tokens in memory with expiration
+let authCache = {
+  accessToken: null,
+  refreshToken: null,
+  expiresAt: null
+};
 
-let accessCode = null;
-let authorization = null;
-let tokenExpire = null;
+const NPSSO = process.env.PSN_NPSSO;
 
-const CLIENT_ID = '09515159-7237-4370-9b40-3806e67c0891';
-const REDIRECT_URI = 'com.scee.psxandroid.scecompcall://redirect';
-
-async function exchangeNpssoForAccessCode() {
-  if (accessCode && tokenExpire && Date.now() < tokenExpire) {
-    console.log('Using cached access code.');
-    return accessCode;
+/**
+ * Get valid access token, refreshing if necessary
+ */
+async function getAccessToken() {
+  // Check if we have a valid cached token
+  if (authCache.accessToken && authCache.expiresAt && Date.now() < authCache.expiresAt) {
+    console.log('Using cached PSN access token');
+    return authCache.accessToken;
   }
-  console.log('Exchanging NPSSO for access code...');
-  const res = await fetch('https://ca.account.sony.com/api/authz/v3/oauth/authorize', {
-    method: 'POST',
-    headers: {
-      'Cookie': `npsso=${NPSSO}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      'Accept': 'application/json',
-      'Origin': 'https://my.playstation.com',
-      'Referer': 'https://my.playstation.com/',
-    },
-    body: new URLSearchParams({
-      access_type: 'offline',
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      response_type: 'code',
-      scope: 'psn:mobile.v2.core psn:clientapp',
-    }),
-  });
 
-  const contentType = res.headers.get('content-type') || '';
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`Token exchange failed with status ${res.status}:`, text);
-    throw new Error(`Failed to exchange NPSSO token. Status: ${res.status}`);
+  // Try to refresh using refresh token if we have one
+  if (authCache.refreshToken) {
+    try {
+      console.log('Refreshing PSN access token...');
+      const authorization = await exchangeRefreshTokenForAuthTokens(authCache.refreshToken);
+      
+      authCache.accessToken = authorization.accessToken;
+      authCache.refreshToken = authorization.refreshToken;
+      // Tokens typically expire in 1 hour, cache for 50 minutes to be safe
+      authCache.expiresAt = Date.now() + (50 * 60 * 1000);
+      
+      console.log('PSN access token refreshed successfully');
+      return authorization.accessToken;
+    } catch (error) {
+      console.error('Failed to refresh token, will obtain new one:', error.message);
+      authCache = { accessToken: null, refreshToken: null, expiresAt: null };
+    }
   }
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    console.error('Unexpected content-type for access code exchange:', contentType);
-    console.error('Response body:', text);
-    throw new Error('Expected JSON response but got different content.');
+
+  // Get fresh tokens from NPSSO
+  try {
+    console.log('Obtaining new PSN access token from NPSSO...');
+    const accessCode = await exchangeNpssoForAccessCode(NPSSO);
+    const authorization = await exchangeAccessCodeForAuthTokens(accessCode);
+    
+    authCache.accessToken = authorization.accessToken;
+    authCache.refreshToken = authorization.refreshToken;
+    authCache.expiresAt = Date.now() + (50 * 60 * 1000);
+    
+    console.log('PSN access token obtained successfully');
+    return authorization.accessToken;
+  } catch (error) {
+    console.error('Failed to obtain PSN access token:', error);
+    throw new Error('PSN authentication failed. Please check your NPSSO token.');
   }
-  const data = await res.json();
-  if (!data.code) {
-    console.error('No access code in token exchange response:', data);
-    throw new Error('No access code received.');
-  }
-  accessCode = data.code;
-  tokenExpire = Date.now() + (data.expires_in || 6000000) - 300000;
-  console.log('Access code obtained successfully.');
-  return accessCode;
 }
 
-async function exchangeAccessCodeForAuthTokens() {
-  if (authorization && tokenExpire && Date.now() < tokenExpire) {
-    console.log('Using cached OAuth tokens.');
-    return authorization;
-  }
-  console.log('Exchanging access code for OAuth tokens...');
-  const code = await exchangeNpssoForAccessCode();
-  const res = await fetch('https://ca.account.sony.com/api/authz/v3/oauth/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      'Accept': 'application/json',
-      'Origin': 'https://my.playstation.com',
-      'Referer': 'https://my.playstation.com/',
-    },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: 'b45c94e90176d6b5a2e6c2413e41d35e848d6208ce6a11c3d4887157b0bb5c1a',
-      code,
-      grant_type: 'authorization_code',
-      redirect_uri: REDIRECT_URI,
-    }),
-  });
+/**
+ * Search for a PSN user and get their account ID
+ * @param {string} onlineId - PSN Online ID (username)
+ * @returns {Promise<string>} Account ID
+ */
+export async function getPSNAccountId(onlineId) {
+  try {
+    const accessToken = await getAccessToken();
+    
+    const searchResults = await makeUniversalSearch(
+      { accessToken },
+      onlineId,
+      'SocialAllAccounts'
+    );
 
-  const contentType = res.headers.get('content-type') || '';
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`OAuth token fetch failed with status ${res.status}:`, text);
-    throw new Error(`Failed to exchange access code for tokens. Status: ${res.status}`);
-  }
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    console.error('Unexpected content-type for OAuth token fetch:', contentType);
-    console.error('Response body:', text);
-    throw new Error('Expected JSON response but got different content.');
-  }
+    if (!searchResults?.domainResponses?.[0]?.results?.length) {
+      throw new Error(`PSN user "${onlineId}" not found`);
+    }
 
-  const data = await res.json();
-  if (!data.access_token) {
-    console.error('No access token in OAuth response:', data);
-    throw new Error('No access token received.');
+    const user = searchResults.domainResponses[0].results[0];
+    return user.socialMetadata.accountId;
+  } catch (error) {
+    console.error('Error searching for PSN user:', error);
+    throw error;
   }
-  authorization = data;
-  tokenExpire = Date.now() + (data.expires_in * 1000 || 3600000) - 300000;
-  console.log('OAuth tokens obtained successfully.');
-  return authorization;
 }
 
-export async function getPSNProfile(onlineId) {
-  console.log(`Fetching PSN profile for ${onlineId}...`);
-  const auth = await exchangeAccessCodeForAuthTokens();
-  const res = await fetch(`https://m.np.playstation.com/api/userProfile/v1/internal/users/${encodeURIComponent(onlineId)}/profiles/2`, {
-    headers: {
-      Authorization: `Bearer ${auth.access_token}`,
-      'X-Platform': 'web',
-      'X-Request-ID': 'request_id_placeholder',
-      'X-App-Version': '1.0.0',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      'Accept': 'application/json',
-    },
-  });
+/**
+ * Get PSN profile and trophy summary
+ * @param {string} onlineIdOrAccountId - PSN Online ID or numeric Account ID
+ * @returns {Promise<Object>} Profile and trophy data
+ */
+export async function getPSNProfile(onlineIdOrAccountId) {
+  try {
+    const accessToken = await getAccessToken();
+    
+    // Determine if input is accountId (numeric) or onlineId (string)
+    let accountId;
+    if (/^\d+$/.test(onlineIdOrAccountId)) {
+      // It's already an account ID
+      accountId = onlineIdOrAccountId;
+    } else {
+      // It's an online ID, need to look up account ID
+      accountId = await getPSNAccountId(onlineIdOrAccountId);
+    }
 
-  const contentType = res.headers.get('content-type') || '';
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`Failed to fetch PSN profile, status ${res.status}:`, text);
-    throw new Error(`Failed to fetch PSN profile for ${onlineId}`);
+    // Get trophy profile summary
+    const trophyData = await getUserTrophyProfileSummary(
+      { accessToken },
+      accountId
+    );
+
+    return {
+      accountId: trophyData.accountId,
+      trophyLevel: trophyData.trophyLevel,
+      progress: trophyData.progress,
+      tier: trophyData.tier,
+      earnedTrophies: trophyData.earnedTrophies
+    };
+  } catch (error) {
+    console.error('Error fetching PSN profile:', error);
+    throw error;
   }
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    console.error('Unexpected content type for PSN profile:', contentType);
-    console.error('Response body:', text);
-    throw new Error('Expected JSON response but got different content.');
-  }
-  return res.json();
 }
 
-export async function getPSNTrophySummary(onlineId) {
-  console.log(`Fetching PSN trophy summary for ${onlineId}...`);
-  const auth = await exchangeAccessCodeForAuthTokens();
-  const res = await fetch(`https://m.np.playstation.com/api/trophy/v1/internal/users/${encodeURIComponent(onlineId)}/trophySummary`, {
-    headers: {
-      Authorization: `Bearer ${auth.access_token}`,
-      'X-Platform': 'web',
-      'X-Request-ID': 'request_id_placeholder',
-      'X-App-Version': '1.0.0',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      'Accept': 'application/json',
-    },
-  });
-
-  const contentType = res.headers.get('content-type') || '';
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`Failed to fetch trophy summary, status ${res.status}:`, text);
-    throw new Error(`Failed to fetch PSN trophies for ${onlineId}`);
+/**
+ * Get PSN trophy summary (wrapper for backward compatibility)
+ * @param {string} onlineIdOrAccountId - PSN Online ID or Account ID
+ * @returns {Promise<Object>} Trophy summary
+ */
+export async function getPSNTrophySummary(onlineIdOrAccountId) {
+  try {
+    const profile = await getPSNProfile(onlineIdOrAccountId);
+    
+    return {
+      trophySummary: {
+        level: profile.trophyLevel,
+        progress: profile.progress,
+        tier: profile.tier,
+        earnedTrophies: {
+          bronze: profile.earnedTrophies.bronze,
+          silver: profile.earnedTrophies.silver,
+          gold: profile.earnedTrophies.gold,
+          platinum: profile.earnedTrophies.platinum
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching PSN trophy summary:', error);
+    throw error;
   }
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    console.error('Unexpected content type for trophy summary:', contentType);
-    console.error('Response body:', text);
-    throw new Error('Expected JSON response but got different content.');
-  }
-  return res.json();
 }

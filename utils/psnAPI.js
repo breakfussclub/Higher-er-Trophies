@@ -116,9 +116,9 @@ export async function getFullProfile(accountId) {
 }
 
 /**
- * Get PSN profile and trophy summary
+ * Get PSN profile and trophy summary with full details
  * @param {string} onlineIdOrAccountId - PSN Online ID or numeric Account ID
- * @returns {Promise<Object>} Profile and trophy data
+ * @returns {Promise<Object>} Complete profile and trophy data
  */
 export async function getPSNProfile(onlineIdOrAccountId) {
   try {
@@ -140,8 +140,18 @@ export async function getPSNProfile(onlineIdOrAccountId) {
       accountId
     );
 
+    // Get full profile for avatar and online ID
+    let fullProfile = null;
+    try {
+      fullProfile = await getFullProfile(accountId);
+    } catch (err) {
+      console.log('Could not fetch full profile (may be private):', err.message);
+    }
+
     return {
       accountId: trophyData.accountId,
+      onlineId: fullProfile?.profile?.onlineId || onlineIdOrAccountId,
+      avatarUrl: fullProfile?.profile?.avatars?.[0]?.url || null,
       trophyLevel: trophyData.trophyLevel,
       progress: trophyData.progress,
       tier: trophyData.tier,

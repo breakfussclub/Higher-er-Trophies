@@ -2,7 +2,7 @@ import {
   exchangeNpssoForAccessCode,
   exchangeAccessCodeForAuthTokens,
   exchangeRefreshTokenForAuthTokens,
-  makeUniversalSearch,
+  getProfileFromUserName,
   getUserTrophyProfileSummary,
   getProfileFromAccountId
 } from 'psn-api';
@@ -20,13 +20,11 @@ const NPSSO = process.env.PSN_NPSSO;
  * Get valid access token, refreshing if necessary
  */
 async function getAccessToken() {
-  // Check if we have a valid cached token
   if (authCache.accessToken && authCache.expiresAt && Date.now() < authCache.expiresAt) {
     console.log('Using cached PSN access token');
     return authCache.accessToken;
   }
 
-  // Try to refresh using refresh token if we have one
   if (authCache.refreshToken) {
     try {
       console.log('Refreshing PSN access token...');
@@ -42,7 +40,6 @@ async function getAccessToken() {
     }
   }
 
-  // Get fresh tokens from NPSSO
   try {
     console.log('Obtaining new PSN access token from NPSSO...');
     const accessCode = await exchangeNpssoForAccessCode(NPSSO);
@@ -68,57 +65,46 @@ export async function getAuthorization() {
 }
 
 /**
- * Search for a PSN user and get their account ID
- * NOTE: PSN's search API won't return your own account if you search for yourself
- * Use "me" for your own authenticated account instead
+ * Get account ID from Online ID (username) - EXACT MATCH
+ * Uses getProfileFromUserName which does exact lookups, not fuzzy search!
  * @param {string} onlineId - PSN Online ID (username)
- * @returns {Promise} Search result with accountId, avatar, and onlineId
+ * @returns {Promise} Profile data with accountId and onlineId
  */
 export async function getPSNAccountId(onlineId) {
   try {
-    const accessToken = await getAccessToken();
-    
     // Special case: "me" refers to the authenticated user
     if (onlineId.toLowerCase() === 'me') {
       console.log('Special identifier "me" detected - using authenticated user');
       return {
         accountId: 'me',
-        avatarUrl: null,
         onlineId: 'me',
         isAuthenticatedUser: true
       };
     }
     
-    const searchResults = await makeUniversalSearch(
-      { accessToken },
-      onlineId,
-      'SocialAllAccounts'
-    );
-
-    if (!searchResults?.domainResponses?.[0]?.results?.length) {
-      throw new Error(`PSN user "${onlineId}" not found`);
-    }
-
-    const results = searchResults.domainResponses[0].results;
-    const user = results[0];
-
-    console.log(`Search for "${onlineId}" returned "${user.socialMetadata.onlineId}"`);
-
+    const authorization = await getAuthorization();
+    
+    // KEY CHANGE: Use getProfileFromUserName for EXACT lookups
+    // This should NOT do fuzzy matching like makeUniversalSearch does
+    console.log(`Looking up exact profile for Online ID: "${onlineId}"`);
+    const profile = await getProfileFromUserName(authorization, onlineId);
+    
+    console.log(`✅ Found exact match: "${profile.onlineId}" (Account ID: ${profile.accountId})`);
+    
     return {
-      accountId: user.socialMetadata.accountId,
-      avatarUrl: user.socialMetadata.avatarUrl || null,
-      onlineId: user.socialMetadata.onlineId || onlineId,
-      isAuthenticatedUser: false
+      accountId: profile.accountId,
+      onlineId: profile.onlineId,
+      isExactMatch: true
     };
   } catch (error) {
-    console.error('Error searching for PSN user:', error);
-    throw error;
+    console.error(`Error looking up PSN user "${onlineId}":`, error.message);
+    throw new Error(`PSN user "${onlineId}" not found. Please verify the username is correct.`);
   }
 }
 
 /**
  * Get full PSN profile with avatar and online ID
- * @param {string} accountId - PSN Account ID (numeric), "me" for authenticated user
+ * @param {string} accountId - PSN Account ID (numeric) or "me" for authenticated user
  * @returns {Promise} Full profile data
  */
 export async function getFullProfile(accountId) {
@@ -137,7 +123,7 @@ export async function getFullProfile(accountId) {
  * Get PSN profile and trophy summary with full details
  * Accepts:
  * - "me" = Your own authenticated account
- * - Online ID (username) = Searches for that user
+ * - Online ID (username) = Direct exact lookup (NOT fuzzy search!)
  * - Numeric account ID = Direct lookup
  * @param {string} onlineIdOrAccountId - "me", PSN Online ID, or numeric Account ID
  * @returns {Promise} Complete profile and trophy data
@@ -156,10 +142,11 @@ export async function getPSNProfile(onlineIdOrAccountId) {
       onlineId = 'me';
     } else if (/^\d+$/.test(onlineIdOrAccountId)) {
       // It's already a numeric account ID
+      console.log(`Using numeric account ID: ${onlineIdOrAccountId}`);
       accountId = onlineIdOrAccountId;
     } else {
-      // It's an online ID, need to look up account ID via search
-      console.log(`Searching for PSN user: "${onlineIdOrAccountId}"`);
+      // It's an online ID, use exact lookup via getPSNAccountId
+      console.log(`\n=== EXACT LOOKUP FOR ONLINE ID: "${onlineIdOrAccountId}" ===`);
       const searchData = await getPSNAccountId(onlineIdOrAccountId);
       accountId = searchData.accountId;
       onlineId = searchData.onlineId;

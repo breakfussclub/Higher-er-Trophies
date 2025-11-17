@@ -50,7 +50,6 @@ export default {
           const steamProfile = await getSteamProfile(userData.steam);
           const steamGames = await getSteamGames(userData.steam);
 
-          // Logging Steam API responses
           console.log('Steam profile:', steamProfile);
           console.log('Steam games:', steamGames);
 
@@ -82,7 +81,6 @@ export default {
           const psnProfile = await getPSNProfile(userData.psn);
           const trophies = await getPSNTrophySummary(psnProfile.accountId);
 
-          // Logging PSN API responses
           console.log('PSN profile:', psnProfile);
           console.log('PSN trophies:', trophies);
 
@@ -105,21 +103,20 @@ export default {
         }
       }
 
-      // Xbox Stats
+      // Xbox Stats (correct property names, logging)
       if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
         try {
           const xboxProfile = await getXboxProfile(userData.xbox);
 
-          // Logging OpenXBL API responses
           console.log('Xbox profile:', xboxProfile);
 
           embed.addFields({
             name: '🎯 Xbox Live',
             value: [
               `**Gamertag:** ${xboxProfile.gamertag ?? 'Unknown'}`,
-              `**Gamerscore:** ${xboxProfile.gamerScore ?? 'Unknown'}`,
+              `**Gamerscore:** ${xboxProfile.gamerscore ?? 'Unknown'}`,
               `**Account Tier:** ${xboxProfile.accountTier ?? 'Unknown'}`,
-              `**Xbox Rep:** ${xboxProfile.XboxOneRep ?? 'Unknown'}`
+              `**Xbox Rep:** ${xboxProfile.xboxOneRep ?? 'Unknown'}`
             ].join('\n'),
             inline: false
           });

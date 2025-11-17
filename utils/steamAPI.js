@@ -4,6 +4,21 @@ import config from '../config.js';
 const STEAM_API_BASE = 'https://api.steampowered.com';
 
 /**
+ * Resolves a Steam vanity URL to SteamID64
+ * @param {string} vanityName - The vanity name part of the URL
+ * @returns {Promise<string>} - The 64-bit SteamID
+ */
+export async function resolveVanityUrl(vanityName) {
+  const url = `${STEAM_API_BASE}/ISteamUser/ResolveVanityURL/v1/?key=${config.steam.apiKey}&vanityurl=${vanityName}`;
+  const response = await fetch(url);
+  const data = await response.json();
+  if (data.response.success !== 1) {
+    throw new Error('Vanity URL could not be resolved');
+  }
+  return data.response.steamid;
+}
+
+/**
  * Get Steam user profile summary
  * @param {string} steamId - 64-bit Steam ID
  * @returns {Promise} User profile data
@@ -41,4 +56,3 @@ export async function getSteamLevel(steamId) {
   const data = await response.json();
   return data.response;
 }
-

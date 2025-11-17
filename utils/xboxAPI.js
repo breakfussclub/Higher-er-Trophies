@@ -23,8 +23,23 @@ async function openXBLRequest(endpoint) {
   }
 
   const data = await response.json();
-  console.log('OpenXBL API response:', JSON.stringify(data, null, 2));
   return data;
+}
+
+/**
+ * Parse settings array into an object
+ * @param {Array} settings - Settings array from API
+ * @returns {Object} Parsed settings object
+ */
+function parseSettings(settings) {
+  const parsed = {};
+  if (!settings || !Array.isArray(settings)) return parsed;
+  
+  settings.forEach(setting => {
+    parsed[setting.id] = setting.value;
+  });
+  
+  return parsed;
 }
 
 /**
@@ -41,7 +56,7 @@ export async function searchGamertag(gamertag) {
   }
 
   console.log(`Found XUID: ${data.people[0].xuid} for gamertag: ${gamertag}`);
-  return data.people[0]; // Return first match
+  return data.people[0];
 }
 
 /**
@@ -69,22 +84,21 @@ export async function getXboxProfile(gamertag) {
     // Then get full account details
     const accountData = await getXboxAccount(xuid);
 
-    console.log('Xbox profile data:', {
-      xuid,
-      gamertag: accountData.gamertag,
-      gamerscore: accountData.gamerScore
-    });
+    // Parse the settings array
+    const settings = parseSettings(accountData.profileUsers?.[0]?.settings);
+
+    console.log('Parsed Xbox settings:', settings);
 
     return {
       xuid: xuid,
-      gamertag: accountData.gamertag || gamertag,
-      gamerscore: accountData.gamerScore || 0,
-      accountTier: accountData.accountTier || 'Unknown',
-      xboxOneRep: accountData.xboxOneRep || 'Unknown',
-      profilePicture: accountData.displayPicRaw || null,
-      bio: accountData.bio || null,
-      location: accountData.location || null,
-      realName: accountData.realName || null
+      gamertag: settings.Gamertag || gamertag,
+      gamerscore: parseInt(settings.Gamerscore) || 0,
+      accountTier: settings.AccountTier || 'Unknown',
+      xboxOneRep: settings.XboxOneRep || 'Unknown',
+      profilePicture: settings.GameDisplayPicRaw || null,
+      bio: settings.Bio || null,
+      location: settings.Location || null,
+      realName: settings.RealName || null
     };
   } catch (error) {
     console.error('Error in getXboxProfile:', error);

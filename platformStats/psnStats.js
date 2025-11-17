@@ -1,4 +1,4 @@
-import { getPSNProfile, getPSNAccountId } from '../utils/psnAPI.js';
+import { getPSNProfile, getFullProfile } from '../utils/psnAPI.js';
 
 function getTrophyEmoji(type) {
   const emojis = {
@@ -63,29 +63,47 @@ export async function getPSNStats(onlineIdOrAccountId) {
       }
     ];
 
-    // Determine display name - if it's a numeric account ID, don't show it
+    // Get additional profile info (avatar, online ID)
+    let avatarUrl = null;
     let displayOnlineId = onlineIdOrAccountId;
     let profileUrl = null;
     
-    // If input was an online ID (not numeric), use it for the profile URL
-    if (!/^\d+$/.test(onlineIdOrAccountId)) {
-      displayOnlineId = onlineIdOrAccountId;
-      profileUrl = `https://psnprofiles.com/${onlineIdOrAccountId}`;
-    } else {
-      // It's a numeric account ID, just show "PSN Account"
-      displayOnlineId = 'PSN Account';
-      // Don't set a URL since we don't have the online ID
+    try {
+      // Get full profile data including avatar
+      const fullProfile = await getFullProfile(profile.accountId);
+      
+      // Get avatar URL (use the largest available)
+      if (fullProfile.profile?.avatars?.length > 0) {
+        avatarUrl = fullProfile.profile.avatars[0].url;
+      }
+      
+      // Get online ID
+      if (fullProfile.profile?.onlineId) {
+        displayOnlineId = fullProfile.profile.onlineId;
+        profileUrl = `https://psnprofiles.com/${fullProfile.profile.onlineId}`;
+      }
+    } catch (err) {
+      // If profile fetch fails, use what we have
+      console.log('Could not fetch full profile info (may be private):', err.message);
+      
+      // Fallback: if original input was an online ID, use it
+      if (!/^\d+$/.test(onlineIdOrAccountId)) {
+        displayOnlineId = onlineIdOrAccountId;
+        profileUrl = `https://psnprofiles.com/${onlineIdOrAccountId}`;
+      } else {
+        displayOnlineId = 'PSN Account';
+      }
     }
 
     return {
-      thumbnail: null,
+      thumbnail: avatarUrl,
       author: profileUrl ? {
         name: displayOnlineId,
-        iconURL: undefined,
+        iconURL: avatarUrl,
         url: profileUrl,
       } : {
         name: displayOnlineId,
-        iconURL: undefined
+        iconURL: avatarUrl
       },
       color: embedColor,
       fields

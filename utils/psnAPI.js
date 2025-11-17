@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 
-// Load NPSSO token from environment
+// Your NPSSO token from environment
 const NPSSO = process.env.NPSSO;
 
 let accessCode = null;
@@ -11,9 +11,8 @@ const CLIENT_ID = '09515159-7237-4370-9b40-3806e67c0891';
 const REDIRECT_URI = 'com.scee.psxandroid.scecompcall://redirect';
 
 async function exchangeNpssoForAccessCode() {
-  if (accessCode && tokenExpire && Date.now() < tokenExpire) {
-    return accessCode;
-  }
+  if (accessCode && tokenExpire && Date.now() < tokenExpire) return accessCode;
+
   try {
     const res = await fetch('https://ca.account.sony.com/api/authz/v3/oauth/authorize', {
       method: 'POST',
@@ -29,37 +28,45 @@ async function exchangeNpssoForAccessCode() {
         scope: 'psn:mobile.v2.core psn:clientapp',
       }),
     });
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('Error in exchangeNpssoForAccessCode response:', res.status, text);
-      throw new Error(`Failed to exchange NPSSO for access code. Status: ${res.status}`);
-    }
+
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       const text = await res.text();
-      console.error('Unexpected response content-type in exchangeNpssoForAccessCode:', contentType, text);
-      throw new Error('Expected JSON response but got different content type');
+      console.error('exchangeNpssoForAccessCode: unexpected content type:', contentType);
+      console.error('Response text:', text);
+      throw new Error('Expected JSON response but received HTML or other content');
     }
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`exchangeNpssoForAccessCode: HTTP error ${res.status}`, text);
+      throw new Error(`HTTP error ${res.status} from Sony Auth`);
+    }
+
     const data = await res.json();
+
     if (!data.code) {
-      console.error('No code in exchangeNpssoForAccessCode response:', data);
-      throw new Error('No access code received from NPSSO exchange');
+      console.error('No access code present in response:', data);
+      throw new Error('No access code in Sony Auth response');
     }
+
     accessCode = data.code;
     tokenExpire = Date.now() + (data.expires_in || 6000000) - 300000;
+    console.log('Exchange NPSSO for access code successful');
     return accessCode;
-  } catch (err) {
-    console.error('Exception in exchangeNpssoForAccessCode:', err);
-    throw err;
+
+  } catch (error) {
+    console.error('Error in exchangeNpssoForAccessCode:', error);
+    throw error;
   }
 }
 
 async function exchangeAccessCodeForAuthTokens() {
-  if (authorization && tokenExpire && Date.now() < tokenExpire) {
-    return authorization;
-  }
+  if (authorization && tokenExpire && Date.now() < tokenExpire) return authorization;
+
   try {
     const code = await exchangeNpssoForAccessCode();
+
     const res = await fetch('https://ca.account.sony.com/api/authz/v3/oauth/token', {
       method: 'POST',
       headers: {
@@ -73,77 +80,95 @@ async function exchangeAccessCodeForAuthTokens() {
         redirect_uri: REDIRECT_URI,
       }),
     });
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('Error in exchangeAccessCodeForAuthTokens response:', res.status, text);
-      throw new Error(`Failed to exchange access code for tokens. Status: ${res.status}`);
-    }
+
     const contentType = res.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       const text = await res.text();
-      console.error('Unexpected response content-type in exchangeAccessCodeForAuthTokens:', contentType, text);
-      throw new Error('Expected JSON response but got different content type');
+      console.error('exchangeAccessCodeForAuthTokens: unexpected content type:', contentType);
+      console.error('Response text:', text);
+      throw new Error('Expected JSON response but received HTML or other content');
     }
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`exchangeAccessCodeForAuthTokens: HTTP error ${res.status}`, text);
+      throw new Error(`HTTP error ${res.status} from Sony Token`);
+    }
+
     const data = await res.json();
+
     if (!data.access_token) {
-      console.error('No access_token in exchangeAccessCodeForAuthTokens response:', data);
-      throw new Error('No access token received');
+      console.error('Access token missing from token exchange response:', data);
+      throw new Error('No access token in token exchange response');
     }
+
     authorization = data;
     tokenExpire = Date.now() + (data.expires_in * 1000 || 3600000) - 300000;
+    console.log('Exchange access code for auth tokens successful');
     return authorization;
-  } catch (err) {
-    console.error('Exception in exchangeAccessCodeForAuthTokens:', err);
-    throw err;
+
+  } catch (error) {
+    console.error('Error in exchangeAccessCodeForAuthTokens:', error);
+    throw error;
   }
 }
 
 export async function getPSNProfile(onlineId) {
-  const auth = await exchangeAccessCodeForAuthTokens();
-  const res = await fetch(`https://m.np.playstation.com/api/userProfile/v1/internal/users/${encodeURIComponent(onlineId)}/profiles/2`, {
-    headers: {
-      Authorization: `Bearer ${auth.access_token}`,
-      'X-Platform': 'web',
-      'X-Request-ID': 'request_id_placeholder',
-      'X-App-Version': '1.0.0',
-    },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('Error fetching PSN profile:', res.status, text);
-    throw new Error(`Failed to fetch PSN profile for ${onlineId}`);
+  try {
+    const auth = await exchangeAccessCodeForAuthTokens();
+    const res = await fetch(`https://m.np.playstation.com/api/userProfile/v1/internal/users/${encodeURIComponent(onlineId)}/profiles/2`, {
+      headers: {
+        Authorization: `Bearer ${auth.access_token}`,
+        'X-Platform': 'web',
+        'X-Request-ID': 'request_id_placeholder',
+        'X-App-Version': '1.0.0',
+      },
+    });
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await res.text();
+      console.error('getPSNProfile: unexpected content type:', contentType);
+      console.error('Response text:', text);
+      throw new Error('Expected JSON response but received HTML or other content');
+    }
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`getPSNProfile: HTTP error ${res.status}`, text);
+      throw new Error(`Failed to fetch PSN profile for ${onlineId}`);
+    }
+    return res.json();
+  } catch (error) {
+    console.error('Error fetching PSN profile:', error);
+    throw error;
   }
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    console.error('Unexpected content-type in getPSNProfile:', contentType, text);
-    throw new Error('Expected JSON response but got different content type');
-  }
-  return res.json();
 }
 
 export async function getPSNTrophySummary(onlineId) {
-  const auth = await exchangeAccessCodeForAuthTokens();
-  const res = await fetch(`https://m.np.playstation.com/api/trophy/v1/internal/users/${encodeURIComponent(onlineId)}/trophySummary`, {
-    headers: {
-      Authorization: `Bearer ${auth.access_token}`,
-      'X-Platform': 'web',
-      'X-Request-ID': 'request_id_placeholder',
-      'X-App-Version': '1.0.0',
-    },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('Error fetching PSN trophy summary:', res.status, text);
-    throw new Error(`Failed to fetch PSN trophies for ${onlineId}`);
+  try {
+    const auth = await exchangeAccessCodeForAuthTokens();
+    const res = await fetch(`https://m.np.playstation.com/api/trophy/v1/internal/users/${encodeURIComponent(onlineId)}/trophySummary`, {
+      headers: {
+        Authorization: `Bearer ${auth.access_token}`,
+        'X-Platform': 'web',
+        'X-Request-ID': 'request_id_placeholder',
+        'X-App-Version': '1.0.0',
+      },
+    });
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await res.text();
+      console.error('getPSNTrophySummary: unexpected content type:', contentType);
+      console.error('Response text:', text);
+      throw new Error('Expected JSON response but received HTML or other content');
+    }
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`getPSNTrophySummary: HTTP error ${res.status}`, text);
+      throw new Error(`Failed to fetch PSN trophies for ${onlineId}`);
+    }
+    return res.json();
+  } catch (error) {
+    console.error('Error fetching PSN trophy summary:', error);
+    throw error;
   }
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    console.error('Unexpected content-type in getPSNTrophySummary:', contentType, text);
-    throw new Error('Expected JSON response but got different content type');
-  }
-  return res.json();
 }
-
-

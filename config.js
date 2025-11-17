@@ -14,6 +14,6 @@ export default {
     npsso: process.env.PSN_NPSSO
   },
   xbox: {
-    apiKey: process.env.OPENXBL_API_KEY  // Changed from clientId/clientSecret
+    apiKey: process.env.OPENXBL_API_KEY
   }
 };

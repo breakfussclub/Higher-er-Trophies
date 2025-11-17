@@ -3,7 +3,8 @@ import {
   exchangeAccessCodeForAuthTokens,
   exchangeRefreshTokenForAuthTokens,
   makeUniversalSearch,
-  getUserTrophyProfileSummary
+  getUserTrophyProfileSummary,
+  getProfileFromAccountId
 } from 'psn-api';
 
 // Store auth tokens in memory with expiration
@@ -63,6 +64,15 @@ async function getAccessToken() {
 }
 
 /**
+ * Get authorization object with access token
+ * @returns {Promise<Object>} Authorization object { accessToken: string }
+ */
+export async function getAuthorization() {
+  const accessToken = await getAccessToken();
+  return { accessToken };
+}
+
+/**
  * Search for a PSN user and get their account ID
  * @param {string} onlineId - PSN Online ID (username)
  * @returns {Promise<string>} Account ID
@@ -85,6 +95,22 @@ export async function getPSNAccountId(onlineId) {
     return user.socialMetadata.accountId;
   } catch (error) {
     console.error('Error searching for PSN user:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get full PSN profile with avatar and online ID
+ * @param {string} accountId - PSN Account ID (numeric)
+ * @returns {Promise<Object>} Full profile data
+ */
+export async function getFullProfile(accountId) {
+  try {
+    const authorization = await getAuthorization();
+    const profile = await getProfileFromAccountId(authorization, accountId);
+    return profile;
+  } catch (error) {
+    console.error('Error fetching full PSN profile:', error);
     throw error;
   }
 }

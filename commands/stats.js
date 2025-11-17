@@ -103,7 +103,7 @@ export default {
         }
       }
 
-      // Xbox Stats (correct property names, logging)
+      // Xbox Stats
       if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
         try {
           const xboxProfile = await getXboxProfile(userData.xbox);

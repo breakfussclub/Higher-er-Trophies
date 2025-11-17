@@ -57,3 +57,11 @@ export async function getPlayerAchievements(steamId, appId) {
   const data = await response.json();
   return data.playerstats;
 }
+
+// NEW: Get achievement schema with names/descriptions for a game
+export async function getAchievementSchema(appId) {
+  const url = `${STEAM_API_BASE}/ISteamUserStats/GetSchemaForGame/v2/?key=${config.steam.apiKey}&appid=${appId}`;
+  const response = await fetch(url);
+  const data = await response.json();
+  return data.game;
+}

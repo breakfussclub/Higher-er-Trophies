@@ -54,6 +54,7 @@ export default {
           if (steamStats.color) embed.setColor(steamStats.color);
           if (steamStats.author) embed.setAuthor(steamStats.author);
           if (steamStats.thumbnail) embed.setThumbnail(steamStats.thumbnail);
+          if (steamStats.footer) embed.setFooter(steamStats.footer);
           embed.addFields(steamStats.fields);
           hasAnyStats = true;
         }
@@ -72,6 +73,7 @@ export default {
           if (psnStats.color && !hasAnyStats) embed.setColor(psnStats.color);
           if (psnStats.author && !hasAnyStats) embed.setAuthor(psnStats.author);
           if (psnStats.thumbnail && !hasAnyStats) embed.setThumbnail(psnStats.thumbnail);
+          if (psnStats.footer && !hasAnyStats) embed.setFooter(psnStats.footer);
           embed.addFields(psnStats.fields);
           hasAnyStats = true;
         }
@@ -90,6 +92,7 @@ export default {
           if (xboxStats.color && !hasAnyStats) embed.setColor(xboxStats.color);
           if (xboxStats.author && !hasAnyStats) embed.setAuthor(xboxStats.author);
           if (xboxStats.thumbnail && !hasAnyStats) embed.setThumbnail(xboxStats.thumbnail);
+          if (xboxStats.footer && !hasAnyStats) embed.setFooter(xboxStats.footer);
           embed.addFields(xboxStats.fields);
           hasAnyStats = true;
         }

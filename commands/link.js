@@ -54,28 +54,47 @@ export default {
         }
       }
 
-      // For PSN, validate but STORE THE ONLINE ID (not Account ID)
+      // For PSN, validate and ensure exact match
       if (platform === 'psn') {
         try {
-          // Validate the username exists by fetching profile
-          const profile = await getPSNProfile(username);
+          console.log(`\n=== LINKING PSN ACCOUNT ===`);
+          console.log(`User input: "${username}"`);
           
+          // Get search results to check for exact match
+          const searchData = await getPSNAccountId(username);
+          
+          console.log(`Search returned: "${searchData.onlineId}"`);
+          console.log(`Exact match: ${searchData.isExactMatch}`);
+
+          // ✅ ADDED: Verify exact match
+          if (!searchData.isExactMatch) {
+            return await interaction.editReply({
+              content: `❌ **Username Mismatch!**\n\nYou searched for: **${username}**\nBut PSN found: **${searchData.onlineId}**\n\nPlease check your PSN username spelling. Visit https://www.psn.com to verify your exact online ID.`,
+              ephemeral: true
+            });
+          }
+
+          // Validate the full profile can be fetched
+          const profile = await getPSNProfile(username);
+
           // Store the Online ID (username), NOT the numeric Account ID
-          accountId = profile.onlineId; // This is the username like "Breakfuss"
+          accountId = profile.onlineId;
           displayName = profile.onlineId;
           
-          console.log(`PSN Link - Storing Online ID: ${accountId}`);
+          console.log(`✅ PSN account validated and ready to store`);
+          console.log(`Storing Online ID: ${accountId}\n`);
+
         } catch (error) {
+          console.error(`❌ PSN linking failed:`, error.message);
           return await interaction.editReply({
-            content: `❌ Could not find PSN account "${username}". Please check:\n• Username is spelled correctly\n• Profile privacy is set to public\n• Trophies are visible to "Anyone"\n\nError: ${error.message}`,
+            content: `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n\n**Please verify:**\n• Username is spelled correctly\n• Your PSN profile is **public**\n• Trophies are visible to **"Anyone"**\n• Check https://www.psn.com to confirm your exact online ID`,
             ephemeral: true
           });
         }
       }
 
-      // For Xbox, we could add validation here too if needed
+      // For Xbox, we store the gamertag as-is
       if (platform === 'xbox') {
-        // Xbox usernames are stored as-is
         displayName = username;
       }
 

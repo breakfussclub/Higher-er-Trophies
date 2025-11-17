@@ -75,7 +75,7 @@ export async function getAuthorization() {
 /**
  * Search for a PSN user and get their account ID
  * @param {string} onlineId - PSN Online ID (username)
- * @returns {Promise<string>} Account ID
+ * @returns {Promise<Object>} Search result with accountId and avatar
  */
 export async function getPSNAccountId(onlineId) {
   try {
@@ -92,7 +92,13 @@ export async function getPSNAccountId(onlineId) {
     }
 
     const user = searchResults.domainResponses[0].results[0];
-    return user.socialMetadata.accountId;
+    
+    // Return both account ID and avatar URL from search
+    return {
+      accountId: user.socialMetadata.accountId,
+      avatarUrl: user.socialMetadata.avatarUrl || null,
+      onlineId: user.socialMetadata.onlineId || onlineId
+    };
   } catch (error) {
     console.error('Error searching for PSN user:', error);
     throw error;
@@ -108,6 +114,7 @@ export async function getFullProfile(accountId) {
   try {
     const authorization = await getAuthorization();
     const profile = await getProfileFromAccountId(authorization, accountId);
+    console.log('Full profile data:', JSON.stringify(profile, null, 2));
     return profile;
   } catch (error) {
     console.error('Error fetching full PSN profile:', error);
@@ -126,13 +133,18 @@ export async function getPSNProfile(onlineIdOrAccountId) {
     
     // Determine if input is accountId (numeric) or onlineId (string)
     let accountId;
+    let searchData = null;
+    
     if (/^\d+$/.test(onlineIdOrAccountId)) {
       // It's already an account ID
       accountId = onlineIdOrAccountId;
     } else {
       // It's an online ID, need to look up account ID
-      accountId = await getPSNAccountId(onlineIdOrAccountId);
+      searchData = await getPSNAccountId(onlineIdOrAccountId);
+      accountId = searchData.accountId;
     }
+
+    console.log(`Fetching trophy data for account ID: ${accountId}`);
 
     // Get trophy profile summary
     const trophyData = await getUserTrophyProfileSummary(
@@ -140,22 +152,41 @@ export async function getPSNProfile(onlineIdOrAccountId) {
       accountId
     );
 
+    console.log('Raw trophy data from API:', JSON.stringify(trophyData, null, 2));
+
     // Get full profile for avatar and online ID
     let fullProfile = null;
+    let avatarUrl = searchData?.avatarUrl || null;
+    let onlineId = searchData?.onlineId || onlineIdOrAccountId;
+    
     try {
       fullProfile = await getFullProfile(accountId);
+      
+      // Try multiple avatar sources
+      if (fullProfile?.profile?.avatars && fullProfile.profile.avatars.length > 0) {
+        avatarUrl = fullProfile.profile.avatars[0].url;
+      }
+      
+      if (fullProfile?.profile?.onlineId) {
+        onlineId = fullProfile.profile.onlineId;
+      }
+      
+      console.log('Avatar URL found:', avatarUrl);
+      console.log('Online ID found:', onlineId);
     } catch (err) {
       console.log('Could not fetch full profile (may be private):', err.message);
     }
 
     return {
       accountId: trophyData.accountId,
-      onlineId: fullProfile?.profile?.onlineId || onlineIdOrAccountId,
-      avatarUrl: fullProfile?.profile?.avatars?.[0]?.url || null,
+      onlineId: onlineId,
+      avatarUrl: avatarUrl,
       trophyLevel: trophyData.trophyLevel,
       progress: trophyData.progress,
       tier: trophyData.tier,
-      earnedTrophies: trophyData.earnedTrophies
+      earnedTrophies: trophyData.earnedTrophies,
+      // Include the raw data for debugging
+      _rawTrophyData: trophyData
     };
   } catch (error) {
     console.error('Error fetching PSN profile:', error);

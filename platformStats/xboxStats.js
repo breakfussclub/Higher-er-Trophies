@@ -1,5 +1,26 @@
 import { getXboxProfile } from '../utils/xboxAPI.js';
 
+function getReputationDisplay(rep) {
+  const repMap = {
+    'GoodPlayer': '✅ Good Player',
+    'Good': '✅ Good',
+    'NeedsWork': '⚡ Needs Work',
+    'AvoidMe': '⚠️ Avoid Me',
+    'Unknown': '❓ Unknown'
+  };
+  return repMap[rep] || '❓ Unknown';
+}
+
+function getTierDisplay(tier) {
+  const tierMap = {
+    'Gold': '🥇 Gold',
+    'Silver': '🥈 Silver',
+    'Bronze': '🥉 Bronze',
+    'Unknown': '⭐ Standard'
+  };
+  return tierMap[tier] || '⭐ Standard';
+}
+
 export async function getXboxStats(xboxGamertag) {
   try {
     console.log(`Fetching Xbox stats for: ${xboxGamertag}`);
@@ -10,21 +31,15 @@ export async function getXboxStats(xboxGamertag) {
     // Format gamerscore with commas
     const formattedGamerscore = xboxProfile.gamerscore?.toLocaleString() || '0';
     
-    // Determine tier emoji
-    let tierEmoji = '⭐';
-    if (xboxProfile.accountTier === 'Gold') tierEmoji = '🥇';
-    else if (xboxProfile.accountTier === 'Silver') tierEmoji = '🥈';
-    
-    // Format reputation
-    let repEmoji = '👍';
-    if (xboxProfile.xboxOneRep === 'Good') repEmoji = '✅';
-    else if (xboxProfile.xboxOneRep === 'Avoid Me') repEmoji = '⚠️';
-    else if (xboxProfile.xboxOneRep === 'Needs Work') repEmoji = '⚡';
+    // Dynamic embed color based on account tier
+    let embedColor = 0x107C10; // Xbox Green default
+    if (xboxProfile.accountTier === 'Gold') embedColor = 0xFFD700; // Gold
+    else if (xboxProfile.accountTier === 'Silver') embedColor = 0xC0C0C0; // Silver
 
     const fields = [
       { 
         name: '🎮 Gamertag', 
-        value: xboxProfile.gamertag || 'Unknown', 
+        value: xboxProfile.gamertag || xboxGamertag, 
         inline: true 
       },
       { 
@@ -33,34 +48,28 @@ export async function getXboxStats(xboxGamertag) {
         inline: true 
       },
       { 
-        name: `${tierEmoji} Account Tier`, 
-        value: xboxProfile.accountTier || 'Unknown', 
+        name: '\u200b', 
+        value: '\u200b', 
         inline: true 
       },
       { 
-        name: `${repEmoji} Reputation`, 
-        value: xboxProfile.xboxOneRep || 'Unknown', 
+        name: 'Account Tier', 
+        value: getTierDisplay(xboxProfile.accountTier), 
+        inline: true 
+      },
+      { 
+        name: 'Reputation', 
+        value: getReputationDisplay(xboxProfile.xboxOneRep), 
+        inline: true 
+      },
+      { 
+        name: '\u200b', 
+        value: '\u200b', 
         inline: true 
       }
     ];
 
-    // Add optional fields if they exist
-    if (xboxProfile.realName) {
-      fields.push({ 
-        name: '👤 Real Name', 
-        value: xboxProfile.realName, 
-        inline: true 
-      });
-    }
-    
-    if (xboxProfile.location) {
-      fields.push({ 
-        name: '📍 Location', 
-        value: xboxProfile.location, 
-        inline: true 
-      });
-    }
-    
+    // Add bio if it exists
     if (xboxProfile.bio) {
       fields.push({ 
         name: '📝 Bio', 
@@ -70,14 +79,26 @@ export async function getXboxStats(xboxGamertag) {
     }
 
     console.log('Xbox fields created:', fields);
-    return fields;
+
+    return {
+      color: embedColor,
+      thumbnail: xboxProfile.profilePicture,
+      author: {
+        name: xboxProfile.gamertag || xboxGamertag,
+        iconURL: xboxProfile.profilePicture,
+        url: `https://www.xbox.com/en-US/play/user/${xboxProfile.gamertag || xboxGamertag}`
+      },
+      fields: fields
+    };
 
   } catch (error) {
     console.error('Error fetching Xbox stats:', error);
-    return [{ 
-      name: 'Xbox Live', 
-      value: `⚠️ Could not fetch Xbox data: ${error.message}\n\nPlease check:\n• Gamertag is spelled correctly\n• Xbox profile is public\n• OpenXBL API key is valid`, 
-      inline: false 
-    }];
+    return {
+      fields: [{ 
+        name: 'Xbox Live', 
+        value: `⚠️ Could not fetch Xbox data: ${error.message}\n\nPlease check:\n• Gamertag is spelled correctly\n• Xbox profile is public\n• OpenXBL API key is valid`, 
+        inline: false 
+      }]
+    };
   }
 }

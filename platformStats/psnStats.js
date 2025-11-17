@@ -1,5 +1,4 @@
 import { getPSNProfile, getPSNAccountId } from '../utils/psnAPI.js';
-import { makeUniversalSearch } from 'psn-api';
 
 function getTrophyEmoji(type) {
   const emojis = {
@@ -64,28 +63,29 @@ export async function getPSNStats(onlineIdOrAccountId) {
       }
     ];
 
-    // Try to get user info for profile picture and online ID
-    let avatarUrl = null;
+    // Determine display name - if it's a numeric account ID, don't show it
     let displayOnlineId = onlineIdOrAccountId;
+    let profileUrl = null;
     
-    try {
-      // If we have an account ID, we can try to get additional profile info
-      if (/^\d+$/.test(onlineIdOrAccountId)) {
-        // We'd need to implement getProfileFromAccountId from psn-api
-        // For now, just use the accountId
-        displayOnlineId = `Account ${profile.accountId}`;
-      }
-    } catch (err) {
-      // If profile lookup fails, just continue with basic info
-      console.log('Could not fetch additional profile info:', err.message);
+    // If input was an online ID (not numeric), use it for the profile URL
+    if (!/^\d+$/.test(onlineIdOrAccountId)) {
+      displayOnlineId = onlineIdOrAccountId;
+      profileUrl = `https://psnprofiles.com/${onlineIdOrAccountId}`;
+    } else {
+      // It's a numeric account ID, just show "PSN Account"
+      displayOnlineId = 'PSN Account';
+      // Don't set a URL since we don't have the online ID
     }
 
     return {
-      thumbnail: avatarUrl,
-      author: {
+      thumbnail: null,
+      author: profileUrl ? {
         name: displayOnlineId,
-        iconURL: avatarUrl,
-        url: `https://psnprofiles.com/${displayOnlineId}`,
+        iconURL: undefined,
+        url: profileUrl,
+      } : {
+        name: displayOnlineId,
+        iconURL: undefined
       },
       color: embedColor,
       fields

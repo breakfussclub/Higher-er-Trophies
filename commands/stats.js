@@ -35,38 +35,79 @@ export default {
       });
     }
 
-    const embed = new EmbedBuilder().setTimestamp();
-
-    if ((platform === 'all' || platform === 'steam') && userData.steam) {
-      const steamStats = await getSteamStats(userData.steam);
-      if (steamStats.color) embed.setColor(steamStats.color);
-      if (steamStats.author) embed.setAuthor(steamStats.author);
-      if (steamStats.thumbnail) embed.setThumbnail(steamStats.thumbnail);
-      embed.addFields(steamStats.fields);
-    } else {
-      embed.setColor(0x5865f2);
-      embed.setAuthor({
+    const embed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setAuthor({
         name: `${targetUser.username}'s Gaming Stats`,
         iconURL: targetUser.displayAvatarURL()
+      })
+      .setTimestamp();
+
+    let hasAnyStats = false;
+    let errorMessages = [];
+
+    // Fetch Steam stats
+    if ((platform === 'all' || platform === 'steam') && userData.steam) {
+      try {
+        const steamStats = await getSteamStats(userData.steam);
+        if (steamStats.fields && steamStats.fields.length > 0) {
+          if (steamStats.color) embed.setColor(steamStats.color);
+          if (steamStats.author) embed.setAuthor(steamStats.author);
+          if (steamStats.thumbnail) embed.setThumbnail(steamStats.thumbnail);
+          embed.addFields(steamStats.fields);
+          hasAnyStats = true;
+        }
+      } catch (error) {
+        console.error('Error fetching Steam stats:', error);
+        errorMessages.push('⚠️ Could not fetch Steam data');
+      }
+    }
+
+    // Fetch PSN stats
+    if ((platform === 'all' || platform === 'psn') && userData.psn) {
+      try {
+        const psnStats = await getPSNStats(userData.psn);
+        if (psnStats.fields && psnStats.fields.length > 0) {
+          // Only override color/author if Steam didn't set them
+          if (psnStats.color && !hasAnyStats) embed.setColor(psnStats.color);
+          if (psnStats.author && !hasAnyStats) embed.setAuthor(psnStats.author);
+          if (psnStats.thumbnail && !hasAnyStats) embed.setThumbnail(psnStats.thumbnail);
+          embed.addFields(psnStats.fields);
+          hasAnyStats = true;
+        }
+      } catch (error) {
+        console.error('Error fetching PSN stats:', error);
+        errorMessages.push('⚠️ Could not fetch PSN data');
+      }
+    }
+
+    // Fetch Xbox stats
+    if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
+      try {
+        const xboxFields = await getXboxStats(userData.xbox);
+        if (xboxFields && xboxFields.length > 0) {
+          embed.addFields(xboxFields);
+          hasAnyStats = true;
+        }
+      } catch (error) {
+        console.error('Error fetching Xbox stats:', error);
+        errorMessages.push('⚠️ Could not fetch Xbox data');
+      }
+    }
+
+    // If no stats were fetched at all
+    if (!hasAnyStats) {
+      return await interaction.editReply({
+        content: `❌ No stats available for the selected platform(s).\n${errorMessages.join('\n')}`
       });
     }
 
-    if ((platform === 'all' || platform === 'psn') && userData.psn) {
-      const psnStats = await getPSNStats(userData.psn);
-      if (psnStats.color) embed.setColor(psnStats.color);
-      if (psnStats.author) embed.setAuthor(psnStats.author);
-      if (psnStats.thumbnail) embed.setThumbnail(psnStats.thumbnail);
-      embed.addFields(psnStats.fields);
-    }
-
-    if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
-      const xboxFields = await getXboxStats(userData.xbox);
-      embed.addFields(xboxFields);
-    }
-
-    if (!embed.data.fields || embed.data.fields.length === 0) {
-      return await interaction.editReply({
-        content: '❌ No stats available for the selected platform(s).'
+    // Add error messages as a field if some platforms failed
+    if (errorMessages.length > 0) {
+      embed.addFields({
+        name: '⚠️ Errors',
+        value: errorMessages.join('\n'),
+        inline: false
       });
     }
 

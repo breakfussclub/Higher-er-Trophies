@@ -27,9 +27,15 @@ function getTierEmoji(tier) {
 
 export async function getPSNStats(onlineIdOrAccountId) {
   try {
+    console.log(`Fetching PSN stats for: ${onlineIdOrAccountId}`);
     const profile = await getPSNProfile(onlineIdOrAccountId);
     
-    console.log('PSN Profile Data:', profile);
+    console.log('PSN Profile Data:', {
+      onlineId: profile.onlineId,
+      accountId: profile.accountId,
+      trophyLevel: profile.trophyLevel,
+      trophies: profile.earnedTrophies
+    });
     
     // Dynamic embed color based on trophy level
     let embedColor = 0x003087; // PSN Blue default
@@ -45,6 +51,8 @@ export async function getPSNStats(onlineIdOrAccountId) {
       profile.earnedTrophies.gold + 
       profile.earnedTrophies.platinum;
 
+    console.log(`Total trophies calculated: ${totalTrophies}`);
+
     const fields = [
       { 
         name: 'PSN Level', 
@@ -57,8 +65,8 @@ export async function getPSNStats(onlineIdOrAccountId) {
         inline: true 
       },
       { 
-        name: 'Account ID', 
-        value: `\`${profile.accountId}\``, 
+        name: 'Online ID', 
+        value: `\`${profile.onlineId}\``, 
         inline: true 
       },
       { 

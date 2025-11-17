@@ -18,7 +18,7 @@ export default {
         ))
     .addStringOption(option =>
       option.setName('username')
-        .setDescription('Your username/ID on the platform')
+        .setDescription('Your username/ID on the platform. For PSN, use "me" for your own account.')
         .setRequired(true)),
 
   async execute(interaction) {
@@ -35,12 +35,10 @@ export default {
       // For Steam, validate and convert to SteamID64 if needed
       if (platform === 'steam') {
         try {
-          // Try to get profile directly (assumes SteamID64)
           const profile = await getSteamProfile(username);
           accountId = username;
           displayName = profile.personaname;
         } catch {
-          // If that fails, try resolving as vanity URL
           try {
             accountId = await resolveVanityUrl(username);
             const profile = await getSteamProfile(accountId);
@@ -54,30 +52,28 @@ export default {
         }
       }
 
-      // For PSN, validate and ensure exact match
+      // For PSN, fetch the profile to get the authenticated user's data
       if (platform === 'psn') {
         try {
           console.log(`\n=== LINKING PSN ACCOUNT ===`);
           console.log(`User input: "${username}"`);
           
-          // Get search results to check for exact match
-          const searchData = await getPSNAccountId(username);
-          
-          console.log(`Search returned: "${searchData.onlineId}"`);
-          console.log(`Exact match: ${searchData.isExactMatch}`);
-
-          // ✅ ADDED: Verify exact match
-          if (!searchData.isExactMatch) {
-            return await interaction.editReply({
-              content: `❌ **Username Mismatch!**\n\nYou searched for: **${username}**\nBut PSN found: **${searchData.onlineId}**\n\nPlease check your PSN username spelling. Visit https://www.psn.com to verify your exact online ID.`,
-              ephemeral: true
-            });
+          // IMPORTANT: PSN's search API has a quirk:
+          // If you search for your own username, it won't return in results
+          // Instead, use "me" to refer to the authenticated user
+          let searchTerm = username;
+          if (username.toLowerCase() === 'me' || username.toLowerCase() === 'self') {
+            searchTerm = 'me';
+            console.log(`Using special identifier: "me" for authenticated user`);
           }
+          
+          // Fetch the profile
+          const profile = await getPSNProfile(searchTerm);
+          
+          console.log(`✅ Profile found - Online ID: "${profile.onlineId}"`);
+          console.log(`Trophy Level: ${profile.trophyLevel}`);
 
-          // Validate the full profile can be fetched
-          const profile = await getPSNProfile(username);
-
-          // Store the Online ID (username), NOT the numeric Account ID
+          // Store the Official Online ID that PSN returned
           accountId = profile.onlineId;
           displayName = profile.onlineId;
           
@@ -87,7 +83,7 @@ export default {
         } catch (error) {
           console.error(`❌ PSN linking failed:`, error.message);
           return await interaction.editReply({
-            content: `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n\n**Please verify:**\n• Username is spelled correctly\n• Your PSN profile is **public**\n• Trophies are visible to **"Anyone"**\n• Check https://www.psn.com to confirm your exact online ID`,
+            content: `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n\n**Tips:**\n• If searching for yourself, use: \`/link psn me\`\n• PSN's search has a quirk: your own username won't show in search results\n• Use "me" for your authenticated account\n• For other users, enter their exact PSN Online ID\n• Make sure their profile is **public** and **trophies visible to "Anyone"**`,
             ephemeral: true
           });
         }

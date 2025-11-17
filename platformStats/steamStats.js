@@ -8,9 +8,25 @@ import {
   getAchievementSchema
 } from '../utils/steamAPI.js';
 
-// Helper: Build Steam game icon URL
 function getGameIcon(appid, img_icon_url) {
   return `https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/${appid}/${img_icon_url}.jpg`;
+}
+
+function getBadgeIcon(appid, badge_image_url) {
+  return `https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/items/${appid}/${badge_image_url}.png`;
+}
+
+function getStatusEmoji(state) {
+  const statuses = {
+    0: '⚪ Offline',
+    1: '🟢 Online',
+    2: '🔴 Busy',
+    3: '🟡 Away',
+    4: '🟠 Snooze',
+    5: '🔵 Trading',
+    6: '🟣 Looking to Play'
+  };
+  return statuses[state] || 'Unknown';
 }
 
 export async function getSteamStats(steamId) {
@@ -21,15 +37,32 @@ export async function getSteamStats(steamId) {
     const badgesData = await getSteamBadges(steamId).catch(() => null);
     const recentGames = await getRecentlyPlayedGames(steamId).catch(() => null);
 
-    // Most played game
+    const totalPlaytime = Math.floor((steamGames.games?.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) || 0)/60);
+
+    // Dynamic color based on Steam Level
+    let embedColor = 0x1E90FF; // Blue default
+    if (steamLevel?.player_level >= 30) embedColor = 0xFFD700; // Gold
+    else if (steamLevel?.player_level >= 10) embedColor = 0x32CD32; // Green
+
+    // Most played game with game icon
     const mostPlayedGame = steamGames.games?.sort((a, b) => b.playtime_forever - a.playtime_forever)[0];
+    const mostPlayedIcon = mostPlayedGame ? getGameIcon(mostPlayedGame.appid, mostPlayedGame.img_icon_url) : null;
 
-    // Game icon for most played
-    const mostPlayedIcon = mostPlayedGame
-      ? getGameIcon(mostPlayedGame.appid, mostPlayedGame.img_icon_url)
-      : null;
+    // Latest badge (if any)
+    let latestBadgeField = null;
+    if (badgesData?.badges?.length) {
+      const latestBadge = badgesData.badges.sort((a, b) => b.level - a.level)[0];
+      if (latestBadge?.appid && latestBadge?.icon) {
+        const badgeUrl = getBadgeIcon(latestBadge.appid, latestBadge.icon);
+        latestBadgeField = {
+          name: '🏅 Latest Badge',
+          value: `![badge](${badgeUrl}) Level ${latestBadge.level ?? ''}`.trim(),
+          inline: true
+        };
+      }
+    }
 
-    // Get latest achievements for most played game
+    // Latest achievements for most played game
     let achievements = [];
     let achievementDisplay = '';
     if (mostPlayedGame) {
@@ -52,29 +85,43 @@ export async function getSteamStats(steamId) {
       }
     }
 
-    // Format recent game activity
+    // Section separator
+    const sep = '––––––––––––––––––––––';
+
+    // Recent activity (with game icons and playtime)
     let recentActivityDisplay = '';
     if (recentGames?.games?.length) {
       recentActivityDisplay = recentGames.games
         .map(g => {
           const gameIcon = getGameIcon(g.appid, g.img_icon_url);
           const time = Math.floor(g.playtime_2weeks / 60);
-          return `![icon](${gameIcon}) **${g.name}** — ${time} hrs (2w)`;
+          return `![icon](${gameIcon}) [${g.name}](https://store.steampowered.com/app/${g.appid}/) — ${time} hrs (2w)`;
         })
         .join('\n');
     }
 
-    // Compose fields
     const embedFields = [
       { name: 'Steam Level', value: `🎚️ ${steamLevel?.player_level ?? 'N/A'}`, inline: true },
       { name: 'Games Owned', value: `🎮 ${steamGames.game_count ?? 'N/A'}`, inline: true },
-      { name: 'Playtime', value: `⏱️ ${Math.floor((steamGames.games?.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) || 0)/60)} hrs`, inline: true },
+      { name: 'Playtime', value: `🕒 ${totalPlaytime} hrs`, inline: true },
       { name: 'Badges', value: `🏅 ${badgesData?.badges?.length ?? 'N/A'}`, inline: true },
-      { name: 'Most Played Game', value: mostPlayedGame ? `[${mostPlayedGame.name}](${steamProfile.profileurl}/stats/${mostPlayedGame.appid}) — ${Math.floor(mostPlayedGame.playtime_forever/60)} hrs` : 'N/A', inline: false },
-      ...(recentActivityDisplay ? [{ name: 'Recent Activity', value: recentActivityDisplay, inline: false }] : []),
+      ...(latestBadgeField ? [latestBadgeField] : []),
+      { name: sep, value: sep, inline: false },
+      mostPlayedGame && {
+        name: 'Most Played Game',
+        value: `![icon](${mostPlayedIcon}) [${mostPlayedGame.name}](https://store.steampowered.com/app/${mostPlayedGame.appid}/) — ${Math.floor(mostPlayedGame.playtime_forever / 60)} hrs`,
+        inline: false
+      },
+      recentActivityDisplay && {
+        name: 'Recent Activity',
+        value: recentActivityDisplay,
+        inline: false
+      },
+      { name: sep, value: sep, inline: false },
       { name: 'Latest Achievements', value: achievementDisplay, inline: false },
-      { name: 'Status', value: getOnlineStatus(steamProfile.personastate), inline: true }
-    ];
+      { name: sep, value: sep, inline: false },
+      { name: 'Status', value: getStatusEmoji(steamProfile.personastate), inline: true }
+    ].filter(Boolean);
 
     return {
       thumbnail: steamProfile.avatarfull,
@@ -83,6 +130,7 @@ export async function getSteamStats(steamId) {
         iconURL: steamProfile.avatarfull,
         url: steamProfile.profileurl
       },
+      color: embedColor,
       fields: embedFields
     };
 
@@ -92,17 +140,4 @@ export async function getSteamStats(steamId) {
       fields: [{ name: 'Steam', value: '⚠️ Could not fetch Steam data', inline: false }]
     };
   }
-}
-
-function getOnlineStatus(state) {
-  const statuses = {
-    0: 'Offline',
-    1: 'Online',
-    2: 'Busy',
-    3: 'Away',
-    4: 'Snooze',
-    5: 'Looking to Trade',
-    6: 'Looking to Play'
-  };
-  return statuses[state] || 'Unknown';
 }

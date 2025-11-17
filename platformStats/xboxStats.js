@@ -64,7 +64,7 @@ export async function getXboxStats(xboxGamertag) {
     if (xboxProfile.bio) {
       fields.push({ 
         name: '📝 Bio', 
-        value: xboxProfile.bio.substring(0, 1024), // Discord field limit
+        value: xboxProfile.bio.substring(0, 1024), 
         inline: false 
       });
     }
@@ -81,26 +81,3 @@ export async function getXboxStats(xboxGamertag) {
     }];
   }
 }
-```
-
-## Key Changes:
-
-1. **Added extensive logging** to see exactly what data we're getting from the API
-2. **Better error messages** that show what went wrong
-3. **Formatted gamerscore** with commas for readability
-4. **Added emojis** to make it more visually appealing
-5. **Optional fields** for real name, location, and bio (if available)
-6. **Better null/undefined handling** to prevent crashes
-
-## Debugging Steps:
-
-After you deploy this, try running `/stats` and check your Railway logs. You should see:
-```
-Fetching Xbox stats for: [gamertag]
-Searching for Xbox gamertag: [gamertag]
-Found XUID: [xuid] for gamertag: [gamertag]
-Fetching Xbox account for XUID: [xuid]
-OpenXBL API response: {...full JSON response...}
-Xbox profile data: {...}
-Xbox profile received: {...}
-Xbox fields created: [...]

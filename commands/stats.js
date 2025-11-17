@@ -37,23 +37,28 @@ export default {
 
     const embed = new EmbedBuilder()
       .setColor(0x5865F2)
-      .setAuthor({ 
-        name: `${targetUser.username}'s Gaming Stats`,
-        iconURL: targetUser.displayAvatarURL()
-      })
       .setTimestamp();
 
+    // Steam Stats – new structure supports author and thumbnail
     if ((platform === 'all' || platform === 'steam') && userData.steam) {
       const steamStats = await getSteamStats(userData.steam);
+      if (steamStats.author) embed.setAuthor(steamStats.author);
       if (steamStats.thumbnail) embed.setThumbnail(steamStats.thumbnail);
       embed.addFields(steamStats.fields);
+    } else {
+      embed.setAuthor({
+        name: `${targetUser.username}'s Gaming Stats`,
+        iconURL: targetUser.displayAvatarURL()
+      });
     }
 
+    // PSN Stats
     if ((platform === 'all' || platform === 'psn') && userData.psn) {
       const psnFields = await getPSNStats(userData.psn);
       embed.addFields(psnFields);
     }
 
+    // Xbox Stats
     if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
       const xboxFields = await getXboxStats(userData.xbox);
       embed.addFields(xboxFields);

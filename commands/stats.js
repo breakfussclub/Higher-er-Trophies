@@ -35,17 +35,18 @@ export default {
       });
     }
 
-    const embed = new EmbedBuilder()
-      .setColor(0x5865F2)
-      .setTimestamp();
+    // Create embed but DO NOT set color/author/thumbnail yet
+    const embed = new EmbedBuilder().setTimestamp();
 
-    // Steam Stats – new structure supports author and thumbnail
+    // Steam Stats: set color, author, and thumbnail from stats object
     if ((platform === 'all' || platform === 'steam') && userData.steam) {
       const steamStats = await getSteamStats(userData.steam);
+      if (steamStats.color) embed.setColor(steamStats.color);
       if (steamStats.author) embed.setAuthor(steamStats.author);
       if (steamStats.thumbnail) embed.setThumbnail(steamStats.thumbnail);
       embed.addFields(steamStats.fields);
     } else {
+      embed.setColor(0x5865F2);
       embed.setAuthor({
         name: `${targetUser.username}'s Gaming Stats`,
         iconURL: targetUser.displayAvatarURL()

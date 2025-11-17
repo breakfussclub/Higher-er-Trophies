@@ -15,7 +15,7 @@ export async function getSteamStats(steamId) {
       { name: 'Steam Level', value: steamLevel?.player_level?.toString() || 'N/A', inline: true },
       { name: 'Games Owned', value: steamGames.game_count?.toString() || 'N/A', inline: true },
       { name: 'Total Playtime (hrs)', value: hours.toLocaleString(), inline: true },
-      { name: 'Status', value: getOnlineStatus(steamProfile.personastate), inline: true }
+      { name: 'Status', value: getOnlineStatus(steamProfile.personastate), inline: true },
     ];
 
     if (steamProfile.gameextrainfo) {
@@ -23,6 +23,7 @@ export async function getSteamStats(steamId) {
     }
 
     return fields;
+
   } catch (error) {
     console.error('Error fetching Steam stats:', error);
     return [{ name: 'Steam', value: '⚠️ Could not fetch Steam data', inline: false }];
@@ -37,7 +38,7 @@ function getOnlineStatus(state) {
     3: 'Away',
     4: 'Snooze',
     5: 'Looking to Trade',
-    6: 'Looking to Play'
+    6: 'Looking to Play',
   };
   return statuses[state] || 'Unknown';
 }

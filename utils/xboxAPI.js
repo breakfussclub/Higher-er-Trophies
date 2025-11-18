@@ -112,8 +112,26 @@ export async function getXboxProfile(gamertag) {
  * @returns {Promise<Object>} Achievement data
  */
 export async function getXboxAchievements(xuid) {
-  const data = await openXBLRequest(`/achievements/${xuid}`);
-  return data;
+  try {
+    // Try the primary achievements endpoint
+    const data = await openXBLRequest(`/achievements/player/${xuid}`);
+    return data;
+  } catch (error) {
+    console.log(`Primary achievements endpoint failed: ${error.message}`);
+    
+    // Fallback 1: Try title-based achievements (requires title ID)
+    try {
+      const data = await openXBLRequest(`/achievements/x360/${xuid}`);
+      return data;
+    } catch (fallbackError) {
+      console.log(`Fallback achievements endpoint failed: ${fallbackError.message}`);
+      
+      // Fallback 2: Return empty structure to prevent crashes
+      // OpenXBL free tier may not support achievement endpoints
+      console.log('Xbox achievement tracking unavailable - API tier limitation or endpoint changed');
+      return { titles: [] };
+    }
+  }
 }
 
 /**
@@ -144,4 +162,19 @@ export async function getXboxFriends(xuid) {
 export async function getXboxActivity(xuid) {
   const data = await openXBLRequest(`/activity/${xuid}`);
   return data;
+}
+
+/**
+ * Get recent player achievements (alternative endpoint)
+ * @param {string} xuid - Xbox User ID
+ * @returns {Promise<Object>} Recent achievements
+ */
+export async function getRecentAchievements(xuid) {
+  try {
+    const data = await openXBLRequest(`/achievements/recent/${xuid}`);
+    return data;
+  } catch (error) {
+    console.log(`Recent achievements endpoint failed: ${error.message}`);
+    return { items: [] };
+  }
 }

@@ -27,8 +27,10 @@ function getTierEmoji(tier) {
 
 export async function getPSNStats(onlineIdOrAccountId) {
   try {
-    console.log(`[PSN Stats] Fetching for: ${onlineIdOrAccountId}`);
+    console.log(`=== FETCHING PSN STATS FOR: ${onlineIdOrAccountId} ===`);
     const profile = await getPSNProfile(onlineIdOrAccountId);
+    console.log('=== COMPLETE PROFILE DATA ===');
+    console.log(JSON.stringify(profile, null, 2));
 
     // Dynamic embed color based on trophy level
     let embedColor = 0x003087; // PSN Blue default
@@ -37,24 +39,23 @@ export async function getPSNStats(onlineIdOrAccountId) {
     else if (profile.trophyLevel >= 200) embedColor = 0xC0C0C0; // Silver
     else if (profile.trophyLevel >= 100) embedColor = 0xCD7F32; // Bronze
 
-    // Calculate total trophies
+    // Calculate total and completion stats
     const totalTrophies =
       profile.earnedTrophies.bronze +
       profile.earnedTrophies.silver +
       profile.earnedTrophies.gold +
       profile.earnedTrophies.platinum;
 
-    // Build fields in Steam-like format: inline stats at top, then larger sections
     const fields = [
-      // Top row: Level, Progress, Total Trophies (inline)
+      // Header section with level and progress
       {
         name: `${getTierEmoji(profile.tier)} PSN Level`,
         value: `**${profile.trophyLevel}** (Tier ${profile.tier})`,
         inline: true
       },
       {
-        name: '📊 Progress',
-        value: `**${profile.progress}%** to next`,
+        name: '📊 Progress to Next',
+        value: `**${profile.progress}%**`,
         inline: true
       },
       {
@@ -62,35 +63,39 @@ export async function getPSNStats(onlineIdOrAccountId) {
         value: `**${totalTrophies.toLocaleString()}**`,
         inline: true
       },
-      // Trophy breakdown row (inline)
+      // Trophy breakdown - organized neatly
       {
-        name: `${getTrophyEmoji('platinum')} Platinum`,
+        name: '\u200B', // Invisible separator
+        value: '\u200B',
+        inline: false
+      },
+      {
+        name: `${getTrophyEmoji('platinum')} Platinum Trophies`,
         value: `**${profile.earnedTrophies.platinum}**`,
         inline: true
       },
       {
-        name: `${getTrophyEmoji('gold')} Gold`,
+        name: `${getTrophyEmoji('gold')} Gold Trophies`,
         value: `**${profile.earnedTrophies.gold}**`,
         inline: true
       },
       {
-        name: `${getTrophyEmoji('silver')} Silver`,
+        name: `${getTrophyEmoji('silver')} Silver Trophies`,
         value: `**${profile.earnedTrophies.silver}**`,
         inline: true
       },
       {
-        name: `${getTrophyEmoji('bronze')} Bronze`,
+        name: `${getTrophyEmoji('bronze')} Bronze Trophies`,
         value: `**${profile.earnedTrophies.bronze}**`,
         inline: true
       }
     ];
 
     return {
-      thumbnail: profile.avatarUrl || undefined,
+      thumbnail: profile.avatarUrl,
       author: {
         name: `${profile.onlineId} - PlayStation Network`,
-        iconURL: profile.avatarUrl || undefined,
-        url: `https://psnprofiles.com/${profile.onlineId}`
+        iconURL: profile.avatarUrl
       },
       footer: {
         text: '🎮 PlayStation Network • Trophy data synced from PSN • Today'
@@ -100,11 +105,11 @@ export async function getPSNStats(onlineIdOrAccountId) {
     };
 
   } catch (error) {
-    console.error('[PSN Stats] Error:', error.message);
+    console.error('Error fetching PSN stats:', error.message);
     return {
       fields: [{
-        name: 'PlayStation Network',
-        value: `⚠️ Could not fetch PSN data: ${error.message}\n\nMake sure:\n• Profile is public\n• Trophies are visible to "Anyone"\n• Username is correct`,
+        name: '❌ PlayStation Network',
+        value: `Error: ${error.message}\n\n**Please verify:**\n• Your PSN Online ID is spelled correctly\n• Your profile is public\n• Trophies are visible to "Anyone"`,
         inline: false
       }]
     };

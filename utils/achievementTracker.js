@@ -127,25 +127,43 @@ async function getXboxAchievementsData(gamertag) {
     const achievements = await getXboxAchievements(xuid);
     
     // Parse achievement data if available
-    if (!achievements?.titles) return [];
+    if (!achievements?.titles || achievements.titles.length === 0) {
+      console.log('No Xbox titles/achievements found in response');
+      return [];
+    }
     
     const newAchievements = [];
     
     for (const title of achievements.titles.slice(0, 5)) { // Top 5 games
+      // Handle different response structures
+      let achievementList = [];
+      
       if (title.achievement?.currentAchievements) {
-        newAchievements.push(...title.achievement.currentAchievements.map(a => ({
-          id: `${title.titleId}_${a.id}`,
-          name: a.name,
-          description: a.description,
+        achievementList = title.achievement.currentAchievements;
+      } else if (title.achievements) {
+        achievementList = title.achievements;
+      } else if (Array.isArray(title.achievement)) {
+        achievementList = title.achievement;
+      }
+      
+      // Only process if we have an array
+      if (Array.isArray(achievementList) && achievementList.length > 0) {
+        const titleAchievements = achievementList.map(a => ({
+          id: `${title.titleId}_${a.id || a.achievementId || a.name}`,
+          name: a.name || a.achievementName || 'Unknown Achievement',
+          description: a.description || a.achievementDescription || '',
           unlockTime: a.timeUnlocked ? new Date(a.timeUnlocked).getTime() / 1000 : null,
-          gameName: title.name,
-          gameId: title.titleId,
-          gamerscore: a.rewards?.[0]?.value || 0,
-          icon: a.mediaAssets?.[0]?.url || null
-        })));
+          gameName: title.name || title.titleName || 'Unknown Game',
+          gameId: title.titleId || title.id,
+          gamerscore: a.rewards?.[0]?.value || a.gamerscore || 0,
+          icon: a.mediaAssets?.[0]?.url || a.imageUrl || null
+        }));
+        
+        newAchievements.push(...titleAchievements);
       }
     }
     
+    console.log(`Found ${newAchievements.length} Xbox achievements for ${gamertag}`);
     return newAchievements;
   } catch (error) {
     console.error('Error fetching Xbox achievements:', error.message);
@@ -158,7 +176,7 @@ async function getXboxAchievementsData(gamertag) {
  * @returns {Object} New achievements organized by user and platform
  */
 export async function checkNewAchievements() {
-  console.log('🔍 Checking for new achievements...');
+  console.log('Checking for new achievements...');
   
   const achievementData = readAchievementData();
   const users = getAllUsers();
@@ -260,7 +278,7 @@ export async function checkNewAchievements() {
   achievementData.lastSync = new Date().toISOString();
   writeAchievementData(achievementData);
 
-  console.log(`✅ Achievement check complete. Found new achievements for ${Object.keys(newAchievements).length} user(s).`);
+  console.log(`Achievement check complete. Found new achievements for ${Object.keys(newAchievements).length} user(s).`);
   
   return newAchievements;
 }

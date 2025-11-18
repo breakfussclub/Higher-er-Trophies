@@ -78,31 +78,22 @@ export async function getPSNStats(onlineIdOrAccountId) {
     console.log(`TOTAL: ${totalTrophies}`);
     console.log(`Avatar URL: ${profile.avatarUrl}`);
 
-    // Create a visually appealing progress bar
-    const progressBar = '█'.repeat(Math.floor(profile.progress / 10)) + 
-                       '░'.repeat(10 - Math.floor(profile.progress / 10));
-
     // Build enhanced fields array with better visual hierarchy
     const fields = [
       {
-        name: '━━━━━━━━━━━━━━━━━━━━━━━',
-        value: '**PLAYER PROFILE**',
-        inline: false
-      },
-      {
         name: '🎮 Level & Tier',
         value: `${getTierEmoji(profile.tier)} **Level ${profile.trophyLevel}** • ${getTierName(profile.tier)} Tier ${profile.tier}`,
-        inline: false
+        inline: true
       },
       {
-        name: '📈 Level Progress',
-        value: `\`${progressBar}\` **${profile.progress}%**`,
-        inline: false
+        name: '📈 Progress to Next Level',
+        value: `**${profile.progress}%**`,
+        inline: true
       },
       {
-        name: '━━━━━━━━━━━━━━━━━━━━━━━',
-        value: '**TROPHY COLLECTION**',
-        inline: false
+        name: '\u200b',
+        value: '\u200b',
+        inline: true
       },
       {
         name: `${getTrophyEmoji('platinum')} Platinum`,
@@ -139,10 +130,10 @@ export async function getPSNStats(onlineIdOrAccountId) {
     return {
       title: `🎮 ${profile.onlineId}'s PlayStation Profile`,
       description: `*Trophy Hunter • ${getTierName(profile.tier)} Tier • PSN Level ${profile.trophyLevel}*`,
-      thumbnail: profile.avatarUrl,  // Small avatar top-right
+      thumbnail: { url: profile.avatarUrl },  // Small avatar top-right
       author: {
         name: profile.onlineId,
-        iconURL: profile.avatarUrl,  // Small avatar next to name
+        icon_url: profile.avatarUrl,  // Small avatar next to name
       },
       url: `https://psnprofiles.com/${profile.onlineId}`,
       footer: {

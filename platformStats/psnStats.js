@@ -25,21 +25,6 @@ function getTierEmoji(tier) {
   return tierMap[tier] || '🎮';
 }
 
-function getTierName(tier) {
-  const tierNames = {
-    1: 'Bronze',
-    2: 'Silver', 
-    3: 'Gold',
-    4: 'Diamond',
-    5: 'Crown',
-    6: 'Star',
-    7: 'Superstar',
-    8: 'Stellar',
-    9: 'Legendary'
-  };
-  return tierNames[tier] || 'Gamer';
-}
-
 export async function getPSNStats(onlineIdOrAccountId) {
   try {
     console.log(`=== FETCHING PSN STATS FOR: ${onlineIdOrAccountId} ===`);
@@ -78,45 +63,45 @@ export async function getPSNStats(onlineIdOrAccountId) {
     console.log(`TOTAL: ${totalTrophies}`);
     console.log(`Avatar URL: ${profile.avatarUrl}`);
 
-    // Build enhanced fields array with better visual hierarchy
+    // Build fields array with correct syntax - FIXED opening braces
     const fields = [
       {
-        name: '🎮 Level & Tier',
-        value: `${getTierEmoji(profile.tier)} **Level ${profile.trophyLevel}** • ${getTierName(profile.tier)} Tier ${profile.tier}`,
+        name: 'PSN Level',
+        value: `${getTierEmoji(profile.tier)} **Level ${profile.trophyLevel}** (Tier ${profile.tier})`,
         inline: true
       },
       {
-        name: '📈 Progress to Next Level',
-        value: `**${profile.progress}%**`,
+        name: 'Progress',
+        value: `📊 **${profile.progress}%** to next level`,
         inline: true
       },
       {
-        name: '\u200b',
-        value: '\u200b',
+        name: 'Online ID',
+        value: `\`${profile.onlineId}\``,
         inline: true
       },
       {
         name: `${getTrophyEmoji('platinum')} Platinum`,
-        value: `**${platinum.toLocaleString()}**`,
+        value: `**${platinum}**`,
         inline: true
       },
       {
         name: `${getTrophyEmoji('gold')} Gold`,
-        value: `**${gold.toLocaleString()}**`,
+        value: `**${gold}**`,
         inline: true
       },
       {
         name: `${getTrophyEmoji('silver')} Silver`,
-        value: `**${silver.toLocaleString()}**`,
+        value: `**${silver}**`,
         inline: true
       },
       {
         name: `${getTrophyEmoji('bronze')} Bronze`,
-        value: `**${bronze.toLocaleString()}**`,
+        value: `**${bronze}**`,
         inline: true
       },
       {
-        name: '🏅 Total Earned',
+        name: '🏅 Total Trophies',
         value: `**${totalTrophies.toLocaleString()}**`,
         inline: true
       },
@@ -128,32 +113,26 @@ export async function getPSNStats(onlineIdOrAccountId) {
     ];
 
     return {
-      title: `🎮 ${profile.onlineId}'s PlayStation Profile`,
-      description: `*Trophy Hunter • ${getTierName(profile.tier)} Tier • PSN Level ${profile.trophyLevel}*`,
-      thumbnail: { url: profile.avatarUrl },  // Small avatar top-right
+      thumbnail: profile.avatarUrl,
       author: {
-        name: profile.onlineId,
-        icon_url: profile.avatarUrl,  // Small avatar next to name
+        name: `${profile.onlineId} - PlayStation Network`,
+        iconURL: profile.avatarUrl,
+        url: `https://psnprofiles.com/${profile.onlineId}`
       },
-      url: `https://psnprofiles.com/${profile.onlineId}`,
       footer: {
         text: '🎮 PlayStation Network • Trophy data synced from PSN',
         iconURL: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/200px-PlayStation_logo.svg.png'
       },
       color: embedColor,
-      fields,
-      timestamp: new Date().toISOString()
+      fields
     };
 
   } catch (error) {
     console.error('Error fetching PSN stats:', error);
     return {
-      title: '⚠️ PlayStation Network Error',
-      description: 'Unable to fetch PSN profile data',
-      color: 0xFF0000,
       fields: [{
-        name: 'Error Details',
-        value: `\`\`\`${error.message}\`\`\`\n**Troubleshooting:**\n• Ensure profile is set to public\n• Check that trophies are visible to "Anyone"\n• Verify the username is correct\n• Try again in a few moments`,
+        name: 'PlayStation Network',
+        value: `⚠️ Could not fetch PSN data: ${error.message}\n\nMake sure:\n• Profile is public\n• Trophies are visible to "Anyone"\n• Username is correct`,
         inline: false
       }]
     };

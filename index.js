@@ -3,6 +3,7 @@ import { readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import config from './config.js';
+import { initializeScheduler } from './utils/scheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,6 +61,9 @@ const rest = new REST({ version: '10' }).setToken(config.discord.token);
 client.once('ready', () => {
   console.log(`✅ ${client.user.tag} is online and ready!`);
   console.log(`📊 Serving ${client.guilds.cache.size} server(s)`);
+  
+  // Initialize achievement scheduler
+  initializeScheduler(client);
 });
 
 // Event: Handle interactions
@@ -90,3 +94,36 @@ client.on('interactionCreate', async interaction => {
 
 // Login
 client.login(config.discord.token);
+```
+
+---
+
+# Updated File Tree
+```
+higher-er-trophies-bot/
+├── commands/
+│   ├── link.js
+│   ├── stats.js
+│   ├── unlink.js
+│   └── sync.js              ← NEW
+├── data/
+│   ├── users.json
+│   └── achievements.json     ← NEW (auto-created)
+├── platformStats/
+│   ├── psnStats.js
+│   ├── steamStats.js
+│   └── xboxStats.js
+├── utils/
+│   ├── psnAPI.js
+│   ├── steamAPI.js
+│   ├── userData.js
+│   ├── xboxAPI.js
+│   ├── achievementTracker.js    ← NEW
+│   ├── achievementFormatter.js  ← NEW
+│   └── scheduler.js             ← NEW
+├── .env
+├── .gitignore
+├── config.js                ← UPDATED
+├── index.js                 ← UPDATED
+├── package.json
+└── readme.md

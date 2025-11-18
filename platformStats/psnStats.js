@@ -122,9 +122,7 @@ export async function getPSNStats(onlineIdOrAccountId) {
 
     return {
       title: `${profile.onlineId} - PlayStation Network`,
-      thumbnail: {
-        url: profile.avatarUrl || undefined
-      },
+      thumbnail: profile.avatarUrl || undefined,
       color: embedColor,
       fields: fields,
       footer: {

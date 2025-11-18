@@ -32,7 +32,7 @@ export default {
       let accountId = username;
       let displayName = username;
 
-      // For Steam, validate and convert to SteamID64 if needed
+      // ===== STEAM - UNTOUCHED =====
       if (platform === 'steam') {
         try {
           const profile = await getSteamProfile(username);
@@ -52,35 +52,47 @@ export default {
         }
       }
 
-      // For PSN, fetch the profile using exact Online ID lookup
+      // ===== PSN - IMPROVED WITH BETTER ERROR MESSAGING =====
       if (platform === 'psn') {
         try {
-          console.log(`\n=== LINKING PSN ACCOUNT ===`);
-          console.log(`User input: "${username}"`);
+          console.log(`\n[PSN Link] User input: "${username}"`);
           
-          // Fetch the profile (now using exact lookup!)
+          // Fetch the profile (uses exact lookup via getProfileFromUserName)
           const profile = await getPSNProfile(username);
           
-          console.log(`✅ Profile found - Online ID: "${profile.onlineId}"`);
-          console.log(`Trophy Level: ${profile.trophyLevel}`);
+          console.log(`[PSN Link] ✅ Profile found - Online ID: "${profile.onlineId}"`);
+          console.log(`[PSN Link] Trophy Level: ${profile.trophyLevel}`);
 
-          // Store the Official Online ID that PSN returned
           accountId = profile.onlineId;
           displayName = profile.onlineId;
           
-          console.log(`✅ PSN account validated and ready to store`);
-          console.log(`Storing Online ID: ${accountId}\n`);
+          console.log(`[PSN Link] Storing Online ID: ${accountId}\n`);
 
         } catch (error) {
-          console.error(`❌ PSN linking failed:`, error.message);
-          return await interaction.editReply({
-            content: `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n\n**Please verify:**\n• Your PSN Online ID is spelled correctly\n• Your PSN profile is **public**\n• Your trophies are visible to **"Anyone"**`,
-            ephemeral: true
-          });
+          console.error(`[PSN Link] ❌ Failed:`, error.message);
+          
+          // Better error message with specific troubleshooting
+          let errorMsg = `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n\n**Please verify:**\n`;
+          
+          if (error.message.includes('not found') || error.message.includes('Double-check')) {
+            errorMsg += '• Your PSN Online ID is spelled **exactly** as it appears on your profile\n';
+            errorMsg += '• Check for capital letters or numbers\n';
+            errorMsg += '• Try with different casing if uncertain';
+          } else if (error.message.includes('not accessible') || error.message.includes('public')) {
+            errorMsg += '• Your PSN profile is set to **Public** (not Private)\n';
+            errorMsg += '• Trophies are visible to **"Anyone"** (check privacy settings)\n';
+            errorMsg += '• Your profile isn\'t restricted by platform/region';
+          } else {
+            errorMsg += '• Your PSN Online ID is correct\n';
+            errorMsg += '• Your profile is public\n';
+            errorMsg += '• Trophies are visible to "Anyone"';
+          }
+          
+          return await interaction.editReply({ content: errorMsg, ephemeral: true });
         }
       }
 
-      // For Xbox, we store the gamertag as-is
+      // ===== XBOX - UNTOUCHED =====
       if (platform === 'xbox') {
         displayName = username;
       }

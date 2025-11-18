@@ -12,32 +12,17 @@ function getTrophyEmoji(type) {
 
 function getTierEmoji(tier) {
   const tierMap = {
-    1: '🥉 Bronze',
-    2: '🥈 Silver',
-    3: '🥇 Gold',
-    4: '💎 Sapphire',
-    5: '👑 Platinum',
-    6: '⭐ Gold Prestige',
-    7: '🌟 Silver Prestige',
-    8: '💫 Bronze Prestige',
-    9: '✨ Legendary'
+    1: '🥉',
+    2: '🥈',
+    3: '🥇',
+    4: '💎',
+    5: '👑',
+    6: '⭐',
+    7: '🌟',
+    8: '💫',
+    9: '✨'
   };
-  return tierMap[tier] || '🎮 Standard';
-}
-
-function getTierColor(tier) {
-  const colors = {
-    1: 0x8B4513, // Bronze
-    2: 0xC0C0C0, // Silver
-    3: 0xFFD700, // Gold
-    4: 0x0F52BA, // Sapphire
-    5: 0xE5E4E2, // Platinum
-    6: 0xFFD700, // Gold Prestige
-    7: 0xC0C0C0, // Silver Prestige
-    8: 0x8B4513, // Bronze Prestige
-    9: 0x00BFFF  // Legendary
-  };
-  return colors[tier] || 0x003087;
+  return tierMap[tier] || '🎮';
 }
 
 export async function getPSNStats(onlineIdOrAccountId) {
@@ -52,98 +37,72 @@ export async function getPSNStats(onlineIdOrAccountId) {
       profile.earnedTrophies.gold +
       profile.earnedTrophies.platinum;
 
-    // Determine embed color (PSN Blue as primary, tier color as accent)
-    const embedColor = 0x003087; // PlayStation Blue
+    // PlayStation Blue color
+    const embedColor = 0x003087;
 
     const fields = [
-      // Row 1: Core Stats (PSN Level, Progress, Total)
+      // Main stats - vertical layout
       {
-        name: '🎮 PSN Level',
-        value: `**${profile.trophyLevel}**`,
-        inline: true
+        name: `${getTierEmoji(profile.tier)} PSN Level`,
+        value: `**${profile.trophyLevel}** (Tier ${profile.tier})`,
+        inline: false
       },
       {
-        name: '📊 Progress',
+        name: '📊 Progress to Next',
         value: `**${profile.progress}%**`,
-        inline: true
+        inline: false
       },
       {
         name: '🏅 Total Trophies',
         value: `**${totalTrophies.toLocaleString()}**`,
-        inline: true
-      },
-
-      // Row 2: Tier Info
-      {
-        name: '🏆 Trophy Tier',
-        value: `**${getTierEmoji(profile.tier)}**`,
-        inline: true
-      },
-      {
-        name: '\u200B', // Invisible spacer
-        value: '\u200B',
-        inline: true
-      },
-      {
-        name: '\u200B', // Invisible spacer
-        value: '\u200B',
-        inline: true
-      },
-
-      // Visual separator
-      {
-        name: '\u200B',
-        value: '━━━━━━━━━━━━━━━━━━━━',
         inline: false
       },
 
-      // Trophy Breakdown - 2x2 Grid
+      // Trophy breakdown - vertical sections
       {
         name: `${getTrophyEmoji('platinum')} Platinum`,
         value: `**${profile.earnedTrophies.platinum}**`,
-        inline: true
+        inline: false
       },
       {
         name: `${getTrophyEmoji('gold')} Gold`,
         value: `**${profile.earnedTrophies.gold}**`,
-        inline: true
+        inline: false
       },
       {
         name: `${getTrophyEmoji('silver')} Silver`,
         value: `**${profile.earnedTrophies.silver}**`,
-        inline: true
+        inline: false
       },
       {
         name: `${getTrophyEmoji('bronze')} Bronze`,
         value: `**${profile.earnedTrophies.bronze}**`,
-        inline: true
+        inline: false
       }
     ];
 
     return {
-      title: `${profile.onlineId} - PlayStation Network`,
-      thumbnail: profile.avatarUrl || undefined,
+      author: {
+        name: `${profile.onlineId} - PlayStation Network`,
+        iconURL: profile.avatarUrl
+      },
+      thumbnail: profile.avatarUrl,
       color: embedColor,
       fields: fields,
       footer: {
-        text: '🎮 PSN Trophy Data • Synced from PlayStation Network'
-      },
-      timestamp: new Date().toISOString()
+        text: 'PSN Trophy Data • Synced from PlayStation Network'
+      }
     };
 
   } catch (error) {
     console.error('[PSN Stats] Error:', error.message);
     return {
-      title: '❌ PlayStation Network Error',
-      color: 0xFF0000,
       fields: [{
-        name: 'Failed to Load Stats',
-        value: `**Error:** ${error.message}\n\n**Troubleshooting:**\n• Verify your PSN Online ID spelling\n• Ensure your profile is **Public**\n• Check that trophies are visible to **"Anyone"**\n• Try using your numeric PSN Account ID if issues persist`,
+        name: '❌ PlayStation Network Error',
+        value: `${error.message}`,
         inline: false
       }],
-      footer: {
-        text: '🎮 PSN Trophy Data • Error occurred'
-      }
+      color: 0xFF0000
     };
   }
 }

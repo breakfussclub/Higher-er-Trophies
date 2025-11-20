@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { getAllUsers } from './userData.js';
 import { getSteamProfile, getPlayerAchievements, getAchievementSchema, getSteamGames } from './steamAPI.js';
 import { getPSNProfile, getPSNUserTitles, getPSNTitleTrophies, getPSNGameTrophies } from './psnAPI.js';
-import { getXboxProfile, searchGamertag, getXboxAchievements } from './xboxAPI.js';
+import { getXboxProfile, searchGamertag, getXboxAchievements, getRecentAchievements } from './xboxAPI.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

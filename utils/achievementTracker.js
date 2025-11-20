@@ -273,17 +273,26 @@ async function getXboxAchievementsData(gamertag) {
       // Handle different response structures
       let achievementList = [];
 
-      if (title.achievement?.currentAchievements) {
+      // Check if currentAchievements exists AND is an array
+      if (Array.isArray(title.achievement?.currentAchievements)) {
         achievementList = title.achievement.currentAchievements;
         console.log(`[Xbox] Found ${achievementList.length} achievements in currentAchievements`);
-      } else if (title.achievements) {
+      } else if (Array.isArray(title.achievements)) {
         achievementList = title.achievements;
         console.log(`[Xbox] Found ${achievementList.length} achievements in achievements array`);
       } else if (Array.isArray(title.achievement)) {
         achievementList = title.achievement;
         console.log(`[Xbox] Found ${achievementList.length} achievements in achievement array`);
       } else {
-        console.log(`[Xbox] No achievements found for title, structure:`, Object.keys(title));
+        // Log what we actually have for debugging
+        if (title.achievement) {
+          console.log(`[Xbox] title.achievement exists but is not an array. Type:`, typeof title.achievement);
+          console.log(`[Xbox] title.achievement structure:`, Object.keys(title.achievement));
+          if (title.achievement.currentAchievements !== undefined) {
+            console.log(`[Xbox] currentAchievements type:`, typeof title.achievement.currentAchievements);
+          }
+        }
+        console.log(`[Xbox] No valid achievement array found for title`);
       }
 
       // Only process if we have an array

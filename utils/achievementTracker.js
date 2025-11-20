@@ -145,6 +145,7 @@ async function getPSNTrophies(psnId) {
             description: staticData?.trophyDetail || '',
             unlockTime: t.earnedDateTime ? new Date(t.earnedDateTime).getTime() / 1000 : null,
             gameName: title.trophyTitleName || 'Unknown Game',
+            gameIcon: title.trophyTitleIconUrl || null,
             gameId: title.npCommunicationId,
             type: t.trophyType,
             rarity: t.trophyEarnedRate,

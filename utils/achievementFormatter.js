@@ -57,14 +57,33 @@ export async function formatAchievementDigest(newAchievements, client) {
     if (achievements.psn && achievements.psn.length > 0) {
       hasContent = true;
 
-      const psnField = achievements.psn
-        .slice(0, 5)
-        .map(t => {
+      // Set thumbnail to the most recent game's icon
+      if (achievements.psn[0].gameIcon) {
+        mainEmbed.setThumbnail(achievements.psn[0].gameIcon);
+      }
+
+      // Group trophies by game
+      const trophiesByGame = {};
+      achievements.psn.forEach(t => {
+        if (!trophiesByGame[t.gameName]) {
+          trophiesByGame[t.gameName] = [];
+        }
+        trophiesByGame[t.gameName].push(t);
+      });
+
+      // Build field value
+      let psnField = '';
+      for (const [gameName, trophies] of Object.entries(trophiesByGame)) {
+        psnField += `**${gameName}**\n`;
+
+        const trophyLines = trophies.map(t => {
           const time = t.unlockTime ? `<t:${Math.floor(t.unlockTime)}:R>` : '';
           const emoji = getTrophyEmoji(t.type) || '🏆';
-          return `${emoji} **${t.name}**\n*${t.gameName}*\n${t.description || 'No description'} ${time}`;
-        })
-        .join('\n\n');
+          return `${emoji} **${t.name}**\n${t.description || 'No description'} ${time}`;
+        });
+
+        psnField += trophyLines.join('\n\n') + '\n\n';
+      }
 
       mainEmbed.addFields({
         name: `🎮 ${username} - PlayStation (${achievements.psn.length} new)`,

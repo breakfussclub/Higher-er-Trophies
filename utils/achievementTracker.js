@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { getAllUsers } from './userData.js';
+import { getAllUsers, linkAccount } from './userData.js';
 import { getSteamProfile, getPlayerAchievements, getAchievementSchema, getSteamGames } from './steamAPI.js';
 import { getPSNProfile, getPSNUserTitles, getPSNTitleTrophies, getPSNGameTrophies } from './psnAPI.js';
 import { getXboxProfile, searchGamertag, getXboxAchievements, getRecentAchievements, getTitleAchievements } from './xboxAPI.js';
@@ -42,10 +42,12 @@ function writeAchievementData(data) {
 /**
  * Get Steam achievements for a user
  */
-async function getSteamAchievements(steamId) {
+async function getSteamAchievements(steamId, user) {
   try {
-    console.log(`[Steam] Fetching games for Steam ID: ${steamId}`);
-    const games = await getSteamGames(steamId);
+    // Use cached SteamID64 if available, otherwise use the stored ID (which might be a vanity URL)
+    const targetId = user?.steamId64 || steamId;
+    console.log(`[Steam] Fetching games for Steam ID: ${targetId}`);
+    const games = await getSteamGames(targetId);
     if (!games.games || games.games.length === 0) {
       console.log('[Steam] No games found');
       return [];
@@ -64,7 +66,7 @@ async function getSteamAchievements(steamId) {
       try {
         console.log(`[Steam] Fetching achievements for: ${game.name} (${game.appid})`);
 
-        const achievements = await getPlayerAchievements(steamId, game.appid);
+        const achievements = await getPlayerAchievements(targetId, game.appid);
         const schema = await getAchievementSchema(game.appid);
 
         // Log what we received
@@ -140,11 +142,24 @@ async function getSteamAchievements(steamId) {
 /**
  * Get PSN trophies for a user (individual trophies)
  */
-async function getPSNTrophies(psnId) {
+async function getPSNTrophies(psnId, user) {
   try {
-    // First get the profile to resolve "me" or username to accountId
-    const profile = await getPSNProfile(psnId);
-    const accountId = profile.accountId;
+    let accountId;
+
+    if (user?.psnAccountId) {
+      accountId = user.psnAccountId;
+      console.log(`[PSN] Using cached Account ID: ${accountId}`);
+    } else {
+      // First get the profile to resolve "me" or username to accountId
+      const profile = await getPSNProfile(psnId);
+      accountId = profile.accountId;
+
+      // Cache it
+      if (user) {
+        console.log(`[PSN] Caching Account ID: ${accountId}`);
+        linkAccount(user.discordId, 'psn', psnId, { accountId });
+      }
+    }
 
     // Get recent titles
     const titlesResponse = await getPSNUserTitles(accountId);
@@ -214,12 +229,21 @@ async function getPSNTrophies(psnId) {
 /**
  * Get Xbox achievements for a user
  */
-async function getXboxAchievementsData(gamertag) {
+async function getXboxAchievementsData(gamertag, user) {
   try {
-    console.log(`[Xbox] Searching for gamertag: ${gamertag}`);
-    const searchResult = await searchGamertag(gamertag);
-    const xuid = searchResult.xuid;
-    console.log(`[Xbox] Found XUID: ${xuid}`);
+    let xuid = user.xboxUid;
+
+    if (!xuid) {
+      console.log(`[Xbox] Searching for gamertag: ${gamertag}`);
+      const searchResult = await searchGamertag(gamertag);
+      xuid = searchResult.xuid;
+      console.log(`[Xbox] Found XUID: ${xuid} (Caching for future use)`);
+
+      // Cache the XUID
+      linkAccount(user.discordId, 'xbox', gamertag, { xuid });
+    } else {
+      console.log(`[Xbox] Using cached XUID: ${xuid}`);
+    }
 
     // Skip broken recent achievements endpoint and go straight to player achievements
     // The recent achievements endpoint (v2) seems to be unstable or requires different params
@@ -324,6 +348,7 @@ async function getXboxAchievementsData(gamertag) {
             })(),
             gameName: title.name || title.titleName || 'Unknown Game',
             gameId: title.titleId || title.id,
+            gameIcon: title.displayImage || null,
             gamerscore: gamerscore,
             icon: icon
           };
@@ -378,7 +403,7 @@ export async function checkNewAchievements() {
     if (user.steam) {
       try {
         console.log(`Checking Steam for user ${userId}...`);
-        const currentAchievements = await getSteamAchievements(user.steam);
+        const currentAchievements = await getSteamAchievements(user.steam, user);
         const previousAchievementIds = achievementData.users[userId].steam.map(a => a.id);
 
         userNewAchievements.steam = currentAchievements.filter(a =>
@@ -396,7 +421,7 @@ export async function checkNewAchievements() {
     if (user.psn) {
       try {
         console.log(`Checking PSN for user ${userId}...`);
-        const currentTrophies = await getPSNTrophies(user.psn);
+        const currentTrophies = await getPSNTrophies(user.psn, user);
 
         // Handle migration from old object format to new array format
         let previousTrophyIds = [];
@@ -431,7 +456,7 @@ export async function checkNewAchievements() {
     if (user.xbox) {
       try {
         console.log(`Checking Xbox for user ${userId}...`);
-        const currentAchievements = await getXboxAchievementsData(user.xbox);
+        const currentAchievements = await getXboxAchievementsData(user.xbox, user);
         const previousAchievementIds = achievementData.users[userId].xbox.map(a => a.id);
 
         userNewAchievements.xbox = currentAchievements.filter(a =>

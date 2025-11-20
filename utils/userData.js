@@ -50,7 +50,7 @@ export function getUser(discordId) {
  * @param {string} platform - Platform name (steam, psn, xbox)
  * @param {string} accountId - Gaming account ID/username
  */
-export function linkAccount(discordId, platform, accountId) {
+export function linkAccount(discordId, platform, accountId, extraData = {}) {
   const data = readUserData();
 
   if (!data[discordId]) {
@@ -62,6 +62,18 @@ export function linkAccount(discordId, platform, accountId) {
   }
 
   data[discordId][platform] = accountId;
+
+  // Store extra data if provided (e.g. xboxUid, psnAccountId, steamId64)
+  if (platform === 'xbox' && extraData.xuid) {
+    data[discordId].xboxUid = extraData.xuid;
+  }
+  if (platform === 'psn' && extraData.accountId) {
+    data[discordId].psnAccountId = extraData.accountId;
+  }
+  if (platform === 'steam' && extraData.steamId64) {
+    data[discordId].steamId64 = extraData.steamId64;
+  }
+
   writeUserData(data);
 }
 
@@ -75,6 +87,17 @@ export function unlinkAccount(discordId, platform) {
 
   if (data[discordId]) {
     data[discordId][platform] = null;
+
+    if (platform === 'xbox') {
+      delete data[discordId].xboxUid;
+    }
+    if (platform === 'psn') {
+      delete data[discordId].psnAccountId;
+    }
+    if (platform === 'steam') {
+      delete data[discordId].steamId64;
+    }
+
     writeUserData(data);
   }
 }

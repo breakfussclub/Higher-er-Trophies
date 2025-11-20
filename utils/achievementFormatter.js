@@ -46,6 +46,7 @@ export async function formatAchievementDigest(newAchievements, client) {
       }
 
       const steamField = achievements.steam
+        .sort((a, b) => (b.unlockTime || 0) - (a.unlockTime || 0))
         .slice(0, 5) // Limit to 5 per user to avoid embed size limits
         .map(a => {
           const time = a.unlockTime ? `<t:${a.unlockTime}:R>` : '';
@@ -71,12 +72,14 @@ export async function formatAchievementDigest(newAchievements, client) {
 
       // Group trophies by game
       const trophiesByGame = {};
-      achievements.psn.forEach(t => {
-        if (!trophiesByGame[t.gameName]) {
-          trophiesByGame[t.gameName] = [];
-        }
-        trophiesByGame[t.gameName].push(t);
-      });
+      achievements.psn
+        .sort((a, b) => (b.unlockTime || 0) - (a.unlockTime || 0))
+        .forEach(t => {
+          if (!trophiesByGame[t.gameName]) {
+            trophiesByGame[t.gameName] = [];
+          }
+          trophiesByGame[t.gameName].push(t);
+        });
 
       // Build field value
       let psnField = '';
@@ -103,7 +106,13 @@ export async function formatAchievementDigest(newAchievements, client) {
     if (achievements.xbox && achievements.xbox.length > 0) {
       hasContent = true;
 
+      // Set thumbnail to the most recent game's icon
+      if (!mainEmbed.data.thumbnail && achievements.xbox[0].gameIcon) {
+        mainEmbed.setThumbnail(achievements.xbox[0].gameIcon);
+      }
+
       const xboxField = achievements.xbox
+        .sort((a, b) => (b.unlockTime || 0) - (a.unlockTime || 0))
         .slice(0, 5)
         .map(a => {
           const time = a.unlockTime ? `<t:${a.unlockTime}:R>` : '';

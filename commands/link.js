@@ -2,6 +2,7 @@ import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { linkAccount, getUser } from '../utils/userData.js';
 import { resolveVanityUrl, getSteamProfile } from '../utils/steamAPI.js';
 import { getPSNAccountId, getPSNProfile } from '../utils/psnAPI.js';
+import { searchGamertag } from '../utils/xboxAPI.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -38,11 +39,13 @@ export default {
           const profile = await getSteamProfile(username);
           accountId = username;
           displayName = profile.personaname;
+          extraData.steamId64 = profile.steamid;
         } catch {
           try {
             accountId = await resolveVanityUrl(username);
             const profile = await getSteamProfile(accountId);
             displayName = profile.personaname;
+            extraData.steamId64 = profile.steamid;
           } catch {
             return await interaction.editReply({
               content: '❌ Could not find Steam account. Please provide either your SteamID64 or custom URL name.',
@@ -56,24 +59,25 @@ export default {
       if (platform === 'psn') {
         try {
           console.log(`\n[PSN Link] User input: "${username}"`);
-          
+
           // Fetch the profile (uses exact lookup via getProfileFromUserName)
           const profile = await getPSNProfile(username);
-          
+
           console.log(`[PSN Link] ✅ Profile found - Online ID: "${profile.onlineId}"`);
           console.log(`[PSN Link] Trophy Level: ${profile.trophyLevel}`);
 
           accountId = profile.onlineId;
           displayName = profile.onlineId;
-          
+          extraData.accountId = profile.accountId;
+
           console.log(`[PSN Link] Storing Online ID: ${accountId}\n`);
 
         } catch (error) {
           console.error(`[PSN Link] ❌ Failed:`, error.message);
-          
+
           // Better error message with specific troubleshooting
           let errorMsg = `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n\n**Please verify:**\n`;
-          
+
           if (error.message.includes('not found') || error.message.includes('Double-check')) {
             errorMsg += '• Your PSN Online ID is spelled **exactly** as it appears on your profile\n';
             errorMsg += '• Check for capital letters or numbers\n';
@@ -87,18 +91,32 @@ export default {
             errorMsg += '• Your profile is public\n';
             errorMsg += '• Trophies are visible to "Anyone"';
           }
-          
+
           return await interaction.editReply({ content: errorMsg, ephemeral: true });
         }
       }
 
-      // ===== XBOX - UNTOUCHED =====
+      let extraData = {};
+
+      // ===== XBOX - IMPROVED =====
       if (platform === 'xbox') {
-        displayName = username;
+        try {
+          console.log(`[Xbox Link] Searching for gamertag: ${username}`);
+          const searchResult = await searchGamertag(username);
+          displayName = searchResult.gamertag || username; // Use official gamertag casing if available
+          extraData.xuid = searchResult.xuid;
+          console.log(`[Xbox Link] Found XUID: ${extraData.xuid}`);
+        } catch (error) {
+          console.error(`[Xbox Link] Failed to find gamertag: ${error.message}`);
+          return await interaction.editReply({
+            content: `❌ Could not find Xbox gamertag "${username}". Please check the spelling.`,
+            ephemeral: true
+          });
+        }
       }
 
       // Save the linked account
-      linkAccount(userId, platform, accountId);
+      linkAccount(userId, platform, accountId, extraData);
 
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)

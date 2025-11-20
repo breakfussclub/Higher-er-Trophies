@@ -32,6 +32,7 @@ export default {
     try {
       let accountId = username;
       let displayName = username;
+      let extraData = {};
 
       // ===== STEAM - UNTOUCHED =====
       if (platform === 'steam') {
@@ -96,7 +97,7 @@ export default {
         }
       }
 
-      let extraData = {};
+
 
       // ===== XBOX - IMPROVED =====
       if (platform === 'xbox') {

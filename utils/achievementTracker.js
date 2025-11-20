@@ -133,7 +133,8 @@ async function getPSNTrophies(psnId) {
               type: t.trophyType,
               rarity: t.trophyEarnedRate,
               icon: t.trophyIconUrl || null
-            }));
+            };
+          });
 
         newTrophies.push(...earnedTrophies);
       } catch (err) {

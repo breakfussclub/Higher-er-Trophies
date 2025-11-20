@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getAllUsers } from './userData.js';
 import { getSteamProfile, getPlayerAchievements, getAchievementSchema, getSteamGames } from './steamAPI.js';
-import { getPSNProfile } from './psnAPI.js';
+import { getPSNProfile, getPSNUserTitles, getPSNTitleTrophies } from './psnAPI.js';
 import { getXboxProfile, searchGamertag, getXboxAchievements } from './xboxAPI.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,7 +48,7 @@ async function getSteamAchievements(steamId) {
     if (!games.games || games.games.length === 0) return [];
 
     const newAchievements = [];
-    
+
     // Check top 5 most played games for new achievements
     const topGames = games.games
       .sort((a, b) => b.playtime_forever - a.playtime_forever)
@@ -92,27 +92,57 @@ async function getSteamAchievements(steamId) {
 /**
  * Get PSN trophies for a user (summary only - detailed trophy fetching requires game-specific calls)
  */
+/**
+ * Get PSN trophies for a user (individual trophies)
+ */
 async function getPSNTrophies(psnId) {
   try {
+    // First get the profile to resolve "me" or username to accountId
     const profile = await getPSNProfile(psnId);
-    
-    // For now, we'll track trophy counts
-    // To get individual trophies, you'd need to call getUserTitles and getTrophiesEarnedForTitle
-    // which would require more API calls per user
-    
-    return {
-      platinum: profile.earnedTrophies.platinum || 0,
-      gold: profile.earnedTrophies.gold || 0,
-      silver: profile.earnedTrophies.silver || 0,
-      bronze: profile.earnedTrophies.bronze || 0,
-      total: (profile.earnedTrophies.platinum || 0) + 
-             (profile.earnedTrophies.gold || 0) + 
-             (profile.earnedTrophies.silver || 0) + 
-             (profile.earnedTrophies.bronze || 0)
-    };
+    const accountId = profile.accountId;
+
+    // Get recent titles
+    const titlesResponse = await getPSNUserTitles(accountId);
+    if (!titlesResponse?.trophyTitles) return [];
+
+    const newTrophies = [];
+
+    // Check top 5 most recent games
+    // PSN returns titles sorted by last updated by default usually, but let's be safe
+    const recentTitles = titlesResponse.trophyTitles.slice(0, 5);
+
+    for (const title of recentTitles) {
+      try {
+        // Skip if no trophies earned
+        if (!title.earnedTrophies || title.earnedTrophies.earned === 0) continue;
+
+        const trophiesResponse = await getPSNTitleTrophies(accountId, title.npCommunicationId);
+        if (!trophiesResponse?.trophies) continue;
+
+        const earnedTrophies = trophiesResponse.trophies
+          .filter(t => t.earned)
+          .map(t => ({
+            id: `${title.npCommunicationId}_${t.trophyId}`,
+            name: t.trophyName || 'Unknown Trophy',
+            description: t.trophyDetail || '',
+            unlockTime: t.earnedDateTime ? new Date(t.earnedDateTime).getTime() / 1000 : null,
+            gameName: title.trophyTitleName || 'Unknown Game',
+            gameId: title.npCommunicationId,
+            type: t.trophyType,
+            rarity: t.trophyEarnedRate,
+            icon: t.trophyIconUrl || null
+          }));
+
+        newTrophies.push(...earnedTrophies);
+      } catch (err) {
+        console.log(`Could not fetch trophies for game ${title.npCommunicationId}:`, err.message);
+      }
+    }
+
+    return newTrophies;
   } catch (error) {
     console.error('Error fetching PSN trophies:', error.message);
-    return null;
+    return [];
   }
 }
 
@@ -123,21 +153,21 @@ async function getXboxAchievementsData(gamertag) {
   try {
     const searchResult = await searchGamertag(gamertag);
     const xuid = searchResult.xuid;
-    
+
     const achievements = await getXboxAchievements(xuid);
-    
+
     // Parse achievement data if available
     if (!achievements?.titles || achievements.titles.length === 0) {
       console.log('No Xbox titles/achievements found in response');
       return [];
     }
-    
+
     const newAchievements = [];
-    
+
     for (const title of achievements.titles.slice(0, 5)) { // Top 5 games
       // Handle different response structures
       let achievementList = [];
-      
+
       if (title.achievement?.currentAchievements) {
         achievementList = title.achievement.currentAchievements;
       } else if (title.achievements) {
@@ -145,7 +175,7 @@ async function getXboxAchievementsData(gamertag) {
       } else if (Array.isArray(title.achievement)) {
         achievementList = title.achievement;
       }
-      
+
       // Only process if we have an array
       if (Array.isArray(achievementList) && achievementList.length > 0) {
         const titleAchievements = achievementList.map(a => ({
@@ -158,11 +188,11 @@ async function getXboxAchievementsData(gamertag) {
           gamerscore: a.rewards?.[0]?.value || a.gamerscore || 0,
           icon: a.mediaAssets?.[0]?.url || a.imageUrl || null
         }));
-        
+
         newAchievements.push(...titleAchievements);
       }
     }
-    
+
     console.log(`Found ${newAchievements.length} Xbox achievements for ${gamertag}`);
     return newAchievements;
   } catch (error) {
@@ -177,26 +207,26 @@ async function getXboxAchievementsData(gamertag) {
  */
 export async function checkNewAchievements() {
   console.log('Checking for new achievements...');
-  
+
   const achievementData = readAchievementData();
   const users = getAllUsers();
   const newAchievements = {};
 
   for (const user of users) {
     const userId = user.discordId;
-    
+
     // Initialize user data if not exists
     if (!achievementData.users[userId]) {
       achievementData.users[userId] = {
         steam: [],
-        psn: { platinum: 0, gold: 0, silver: 0, bronze: 0, total: 0 },
+        psn: [],
         xbox: []
       };
     }
 
     const userNewAchievements = {
       steam: [],
-      psn: null,
+      psn: [],
       xbox: []
     };
 
@@ -206,8 +236,8 @@ export async function checkNewAchievements() {
         console.log(`Checking Steam for user ${userId}...`);
         const currentAchievements = await getSteamAchievements(user.steam);
         const previousAchievementIds = achievementData.users[userId].steam.map(a => a.id);
-        
-        userNewAchievements.steam = currentAchievements.filter(a => 
+
+        userNewAchievements.steam = currentAchievements.filter(a =>
           !previousAchievementIds.includes(a.id)
         );
 
@@ -223,26 +253,31 @@ export async function checkNewAchievements() {
       try {
         console.log(`Checking PSN for user ${userId}...`);
         const currentTrophies = await getPSNTrophies(user.psn);
-        const previousTrophies = achievementData.users[userId].psn;
 
-        if (currentTrophies && previousTrophies) {
-          const diff = {
-            platinum: currentTrophies.platinum - previousTrophies.platinum,
-            gold: currentTrophies.gold - previousTrophies.gold,
-            silver: currentTrophies.silver - previousTrophies.silver,
-            bronze: currentTrophies.bronze - previousTrophies.bronze,
-            total: currentTrophies.total - previousTrophies.total
-          };
-
-          if (diff.total > 0) {
-            userNewAchievements.psn = diff;
-          }
+        // Handle migration from old object format to new array format
+        let previousTrophyIds = [];
+        if (Array.isArray(achievementData.users[userId].psn)) {
+          previousTrophyIds = achievementData.users[userId].psn.map(t => t.id);
+        } else {
+          console.log(`Migrating PSN data for user ${userId} to new format...`);
+          // If it was the old object format, we treat all current trophies as "seen" 
+          // to avoid spamming old trophies, OR we could treat them as new.
+          // Better to treat as seen so we don't spam. 
+          // But since we can't know WHICH ones they had, we might just have to accept 
+          // that the first run will populate the list without notifying, 
+          // or we just notify for everything found in the last X hours?
+          // Let's just populate the list for the first run and NOT notify to be safe,
+          // or maybe just notify. 
+          // Implementation decision: If migrating, don't notify.
+          previousTrophyIds = currentTrophies.map(t => t.id);
         }
+
+        userNewAchievements.psn = currentTrophies.filter(t =>
+          !previousTrophyIds.includes(t.id)
+        );
 
         // Update stored trophies
-        if (currentTrophies) {
-          achievementData.users[userId].psn = currentTrophies;
-        }
+        achievementData.users[userId].psn = currentTrophies;
       } catch (err) {
         console.error(`Error checking PSN for ${userId}:`, err.message);
       }
@@ -254,8 +289,8 @@ export async function checkNewAchievements() {
         console.log(`Checking Xbox for user ${userId}...`);
         const currentAchievements = await getXboxAchievementsData(user.xbox);
         const previousAchievementIds = achievementData.users[userId].xbox.map(a => a.id);
-        
-        userNewAchievements.xbox = currentAchievements.filter(a => 
+
+        userNewAchievements.xbox = currentAchievements.filter(a =>
           !previousAchievementIds.includes(a.id)
         );
 
@@ -267,9 +302,9 @@ export async function checkNewAchievements() {
     }
 
     // Only add to results if user has new achievements
-    if (userNewAchievements.steam.length > 0 || 
-        userNewAchievements.psn || 
-        userNewAchievements.xbox.length > 0) {
+    if (userNewAchievements.steam.length > 0 ||
+      userNewAchievements.psn.length > 0 ||
+      userNewAchievements.xbox.length > 0) {
       newAchievements[userId] = userNewAchievements;
     }
   }
@@ -279,7 +314,7 @@ export async function checkNewAchievements() {
   writeAchievementData(achievementData);
 
   console.log(`Achievement check complete. Found new achievements for ${Object.keys(newAchievements).length} user(s).`);
-  
+
   return newAchievements;
 }
 

@@ -4,7 +4,9 @@ import {
   exchangeRefreshTokenForAuthTokens,
   getProfileFromUserName,
   getUserTrophyProfileSummary,
-  getProfileFromAccountId
+  getProfileFromAccountId,
+  getUserTitles,
+  getUserTrophiesEarnedForTitle
 } from 'psn-api';
 
 let authCache = {
@@ -72,20 +74,20 @@ export async function getPSNAccountId(onlineId) {
         isAuthenticatedUser: true
       };
     }
-    
+
     const authorization = await getAuthorization();
-    
+
     console.log(`[PSN] Looking up exact profile for Online ID: "${onlineId}"`);
     const response = await getProfileFromUserName(authorization, onlineId);
-    
+
     // Extract from nested profile object
     const profile = response.profile || response;
-    
+
     const accountId = profile.accountId;
     const returnedOnlineId = profile.onlineId;
-    
+
     console.log(`[PSN] ✅ Found exact match: "${returnedOnlineId}" (Account ID: ${accountId})`);
-    
+
     return {
       accountId: accountId,
       onlineId: returnedOnlineId,
@@ -93,7 +95,7 @@ export async function getPSNAccountId(onlineId) {
     };
   } catch (error) {
     console.error(`[PSN] ❌ Error looking up "${onlineId}":`, error.message);
-    
+
     // Better error messaging for common cases
     if (error.message.includes('not found') || error.message.includes('404')) {
       throw new Error(`PSN user "${onlineId}" not found. Double-check the spelling of your Online ID.`);
@@ -204,5 +206,50 @@ export async function getPSNTrophySummary(onlineIdOrAccountId) {
   } catch (error) {
     console.error('[PSN] Error fetching PSN trophy summary:', error.message);
     throw error;
+  }
+}
+
+/**
+ * Get user's game titles
+ * @param {string} accountId - PSN Account ID
+ * @returns {Promise} List of game titles
+ */
+export async function getPSNUserTitles(accountId) {
+  try {
+    const authorization = await getAuthorization();
+    console.log(`[PSN] Fetching titles for account ID: ${accountId}`);
+    const response = await getUserTitles(authorization, accountId);
+    return response;
+  } catch (error) {
+    console.error('[PSN] Error fetching user titles:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get trophies earned for a specific title
+ * @param {string} accountId - PSN Account ID
+ * @param {string} npCommunicationId - Game's NP Communication ID
+ * @param {string} trophyGroupId - Trophy Group ID (usually "default")
+ * @returns {Promise} List of earned trophies
+ */
+export async function getPSNTitleTrophies(accountId, npCommunicationId, trophyGroupId = 'default') {
+  try {
+    const authorization = await getAuthorization();
+    // console.log(`[PSN] Fetching trophies for title: ${npCommunicationId}`);
+    const response = await getUserTrophiesEarnedForTitle(
+      authorization,
+      accountId,
+      npCommunicationId,
+      trophyGroupId,
+      {
+        includeMetadata: true
+      }
+    );
+    return response;
+  } catch (error) {
+    // Some games might not have trophies or might error out, just log and return null
+    console.error(`[PSN] Error fetching trophies for title ${npCommunicationId}:`, error.message);
+    return null;
   }
 }

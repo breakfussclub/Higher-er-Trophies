@@ -37,7 +37,7 @@ export async function formatAchievementDigest(newAchievements, client) {
     // Steam Achievements
     if (achievements.steam && achievements.steam.length > 0) {
       hasContent = true;
-      
+
       const steamField = achievements.steam
         .slice(0, 5) // Limit to 5 per user to avoid embed size limits
         .map(a => {
@@ -54,18 +54,21 @@ export async function formatAchievementDigest(newAchievements, client) {
     }
 
     // PSN Trophies
-    if (achievements.psn) {
+    if (achievements.psn && achievements.psn.length > 0) {
       hasContent = true;
-      
-      const trophies = [];
-      if (achievements.psn.platinum > 0) trophies.push(`${getTrophyEmoji('platinum')} ${achievements.psn.platinum} Platinum`);
-      if (achievements.psn.gold > 0) trophies.push(`${getTrophyEmoji('gold')} ${achievements.psn.gold} Gold`);
-      if (achievements.psn.silver > 0) trophies.push(`${getTrophyEmoji('silver')} ${achievements.psn.silver} Silver`);
-      if (achievements.psn.bronze > 0) trophies.push(`${getTrophyEmoji('bronze')} ${achievements.psn.bronze} Bronze`);
+
+      const psnField = achievements.psn
+        .slice(0, 5)
+        .map(t => {
+          const time = t.unlockTime ? `<t:${Math.floor(t.unlockTime)}:R>` : '';
+          const emoji = getTrophyEmoji(t.type) || '🏆';
+          return `${emoji} **${t.name}**\n*${t.gameName}*\n${t.description || 'No description'} ${time}`;
+        })
+        .join('\n\n');
 
       mainEmbed.addFields({
-        name: `🎮 ${username} - PlayStation (${achievements.psn.total} new)`,
-        value: trophies.join(' • '),
+        name: `🎮 ${username} - PlayStation (${achievements.psn.length} new)`,
+        value: psnField.substring(0, 1024),
         inline: false
       });
     }
@@ -73,7 +76,7 @@ export async function formatAchievementDigest(newAchievements, client) {
     // Xbox Achievements
     if (achievements.xbox && achievements.xbox.length > 0) {
       hasContent = true;
-      
+
       const xboxField = achievements.xbox
         .slice(0, 5)
         .map(a => {

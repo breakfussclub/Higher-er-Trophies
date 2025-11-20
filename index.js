@@ -2,8 +2,11 @@ import { Client, GatewayIntentBits, Collection, REST, Routes } from 'discord.js'
 import { readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import cron from 'node-cron';
 import config from './config.js';
-import { initializeScheduler } from './utils/scheduler.js';
+import logger from './utils/logger.js';
+import { checkNewAchievements } from './jobs/syncAchievements.js';
+import { formatAchievementDigest } from './utils/achievementFormatter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -33,9 +36,9 @@ for (const file of commandFiles) {
   if ('data' in command.default && 'execute' in command.default) {
     client.commands.set(command.default.data.name, command.default);
     commands.push(command.default.data.toJSON());
-    console.log(`Loaded command: ${command.default.data.name}`);
+    logger.info(`Loaded command: ${command.default.data.name}`);
   } else {
-    console.log(`Command at ${filePath} is missing required "data" or "execute" property.`);
+    logger.warn(`Command at ${filePath} is missing required "data" or "execute" property.`);
   }
 }
 
@@ -44,26 +47,55 @@ const rest = new REST({ version: '10' }).setToken(config.discord.token);
 
 (async () => {
   try {
-    console.log(`Started refreshing ${commands.length} application (/) commands.`);
+    logger.info(`Started refreshing ${commands.length} application (/) commands.`);
 
     const data = await rest.put(
       Routes.applicationGuildCommands(config.discord.clientId, config.discord.guildId),
       { body: commands }
     );
 
-    console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+    logger.info(`Successfully reloaded ${data.length} application (/) commands.`);
   } catch (error) {
-    console.error('Error registering commands:', error);
+    logger.error('Error registering commands:', error);
   }
 })();
 
 // Event: Bot ready
 client.once('ready', () => {
-  console.log(`${client.user.tag} is online and ready!`);
-  console.log(`Serving ${client.guilds.cache.size} server(s)`);
-  
-  // Initialize achievement scheduler
-  initializeScheduler(client);
+  logger.info(`${client.user.tag} is online and ready!`);
+  logger.info(`Serving ${client.guilds.cache.size} server(s)`);
+
+  // Initialize Scheduler with node-cron
+  if (config.discord.achievementChannelId) {
+    const schedule = config.scheduler.cronSchedule || '0 * * * *'; // Default hourly
+    logger.info(`📅 Scheduler initialized: ${schedule}`);
+
+    cron.schedule(schedule, async () => {
+      logger.info('🔄 Running scheduled achievement sync...');
+      try {
+        const newAchievements = await checkNewAchievements();
+
+        if (Object.keys(newAchievements).length > 0) {
+          const channel = client.channels.cache.get(config.discord.achievementChannelId);
+          if (channel) {
+            const embeds = await formatAchievementDigest(newAchievements, client);
+            for (const embed of embeds) {
+              await channel.send({ embeds: [embed] });
+            }
+            logger.info(`✅ Posted achievements for ${Object.keys(newAchievements).length} user(s).`);
+          } else {
+            logger.warn('⚠️ Achievement channel not found.');
+          }
+        } else {
+          logger.info('✅ No new achievements found.');
+        }
+      } catch (error) {
+        logger.error('❌ Error in scheduled sync:', error);
+      }
+    });
+  } else {
+    logger.warn('⚠️ ACHIEVEMENT_CHANNEL_ID not set. Scheduled syncs disabled.');
+  }
 });
 
 // Event: Handle interactions
@@ -73,14 +105,14 @@ client.on('interactionCreate', async interaction => {
   const command = client.commands.get(interaction.commandName);
 
   if (!command) {
-    console.error(`No command matching ${interaction.commandName} was found.`);
+    logger.error(`No command matching ${interaction.commandName} was found.`);
     return;
   }
 
   try {
     await command.execute(interaction);
   } catch (error) {
-    console.error(`Error executing ${interaction.commandName}:`, error);
+    logger.error(`Error executing ${interaction.commandName}:`, error);
 
     const errorMessage = { content: 'There was an error executing this command!', ephemeral: true };
 

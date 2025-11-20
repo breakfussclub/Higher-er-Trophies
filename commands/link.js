@@ -1,8 +1,8 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { linkAccount, getUser } from '../utils/userData.js';
-import { resolveVanityUrl, getSteamProfile } from '../utils/steamAPI.js';
-import { getPSNAccountId, getPSNProfile } from '../utils/psnAPI.js';
-import { searchGamertag } from '../utils/xboxAPI.js';
+import { query } from '../database/db.js';
+import { resolveVanityUrl, getSteamProfile } from '../services/steamService.js';
+import { getPSNAccountId, getPSNProfile } from '../services/psnService.js';
+import { searchGamertag } from '../services/xboxService.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -34,7 +34,7 @@ export default {
       let displayName = username;
       let extraData = {};
 
-      // ===== STEAM - UNTOUCHED =====
+      // ===== STEAM =====
       if (platform === 'steam') {
         try {
           const profile = await getSteamProfile(username);
@@ -56,59 +56,26 @@ export default {
         }
       }
 
-      // ===== PSN - IMPROVED WITH BETTER ERROR MESSAGING =====
+      // ===== PSN =====
       if (platform === 'psn') {
         try {
-          console.log(`\n[PSN Link] User input: "${username}"`);
-
-          // Fetch the profile (uses exact lookup via getProfileFromUserName)
           const profile = await getPSNProfile(username);
-
-          console.log(`[PSN Link] ✅ Profile found - Online ID: "${profile.onlineId}"`);
-          console.log(`[PSN Link] Trophy Level: ${profile.trophyLevel}`);
-
           accountId = profile.onlineId;
           displayName = profile.onlineId;
           extraData.accountId = profile.accountId;
-
-          console.log(`[PSN Link] Storing Online ID: ${accountId}\n`);
-
         } catch (error) {
-          console.error(`[PSN Link] ❌ Failed:`, error.message);
-
-          // Better error message with specific troubleshooting
-          let errorMsg = `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n\n**Please verify:**\n`;
-
-          if (error.message.includes('not found') || error.message.includes('Double-check')) {
-            errorMsg += '• Your PSN Online ID is spelled **exactly** as it appears on your profile\n';
-            errorMsg += '• Check for capital letters or numbers\n';
-            errorMsg += '• Try with different casing if uncertain';
-          } else if (error.message.includes('not accessible') || error.message.includes('public')) {
-            errorMsg += '• Your PSN profile is set to **Public** (not Private)\n';
-            errorMsg += '• Trophies are visible to **"Anyone"** (check privacy settings)\n';
-            errorMsg += '• Your profile isn\'t restricted by platform/region';
-          } else {
-            errorMsg += '• Your PSN Online ID is correct\n';
-            errorMsg += '• Your profile is public\n';
-            errorMsg += '• Trophies are visible to "Anyone"';
-          }
-
+          let errorMsg = `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n`;
           return await interaction.editReply({ content: errorMsg, ephemeral: true });
         }
       }
 
-
-
-      // ===== XBOX - IMPROVED =====
+      // ===== XBOX =====
       if (platform === 'xbox') {
         try {
-          console.log(`[Xbox Link] Searching for gamertag: ${username}`);
           const searchResult = await searchGamertag(username);
-          displayName = searchResult.gamertag || username; // Use official gamertag casing if available
+          displayName = searchResult.gamertag || username;
           extraData.xuid = searchResult.xuid;
-          console.log(`[Xbox Link] Found XUID: ${extraData.xuid}`);
         } catch (error) {
-          console.error(`[Xbox Link] Failed to find gamertag: ${error.message}`);
           return await interaction.editReply({
             content: `❌ Could not find Xbox gamertag "${username}". Please check the spelling.`,
             ephemeral: true
@@ -116,8 +83,24 @@ export default {
         }
       }
 
-      // Save the linked account
-      linkAccount(userId, platform, accountId, extraData);
+      // Save to Database
+      // 1. Ensure user exists
+      await query(
+        `INSERT INTO users (discord_id) VALUES ($1) ON CONFLICT (discord_id) DO NOTHING`,
+        [userId]
+      );
+
+      // 2. Link account
+      await query(
+        `INSERT INTO linked_accounts (discord_id, platform, account_id, username, extra_data)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (discord_id, platform) DO UPDATE 
+         SET account_id = EXCLUDED.account_id, 
+             username = EXCLUDED.username,
+             extra_data = EXCLUDED.extra_data,
+             created_at = CURRENT_TIMESTAMP`,
+        [userId, platform, accountId, displayName, JSON.stringify(extraData)]
+      );
 
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)

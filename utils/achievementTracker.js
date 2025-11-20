@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getAllUsers } from './userData.js';
 import { getSteamProfile, getPlayerAchievements, getAchievementSchema, getSteamGames } from './steamAPI.js';
-import { getPSNProfile, getPSNUserTitles, getPSNTitleTrophies } from './psnAPI.js';
+import { getPSNProfile, getPSNUserTitles, getPSNTitleTrophies, getPSNGameTrophies } from './psnAPI.js';
 import { getXboxProfile, searchGamertag, getXboxAchievements } from './xboxAPI.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -116,25 +116,41 @@ async function getPSNTrophies(psnId) {
         // Skip if no trophies earned
         if (!title.earnedTrophies || title.earnedTrophies.earned === 0) continue;
 
-        const trophiesResponse = await getPSNTitleTrophies(accountId, title.npCommunicationId);
-        if (!trophiesResponse?.trophies) continue;
+        // 1. Get user's earned status
+        const earnedResponse = await getPSNTitleTrophies(accountId, title.npCommunicationId);
+        if (!earnedResponse?.trophies) continue;
 
-        const earnedTrophies = trophiesResponse.trophies
-          .filter(t => t.earned)
-          .map((t, index) => {
-            if (index === 0) console.log('DEBUG TROPHY:', JSON.stringify(t, null, 2));
-            return {
-              id: `${title.npCommunicationId}_${t.trophyId}`,
-              name: t.trophyName || 'Unknown Trophy',
-              description: t.trophyDetail || '',
-              unlockTime: t.earnedDateTime ? new Date(t.earnedDateTime).getTime() / 1000 : null,
-              gameName: title.trophyTitleName || 'Unknown Game',
-              gameId: title.npCommunicationId,
-              type: t.trophyType,
-              rarity: t.trophyEarnedRate,
-              icon: t.trophyIconUrl || null
-            };
-          });
+        // Filter to only earned trophies first to save API calls if possible (though we need metadata)
+        const userEarnedTrophies = earnedResponse.trophies.filter(t => t.earned);
+        if (userEarnedTrophies.length === 0) continue;
+
+        // 2. Get static game data (names, descriptions)
+        // We only need this if we have earned trophies to report
+        const gameDataResponse = await getPSNGameTrophies(title.npCommunicationId);
+        if (!gameDataResponse?.trophies) {
+          console.log(`Could not fetch game metadata for ${title.npCommunicationId}`);
+          continue;
+        }
+
+        // Map static data by trophy ID for easy lookup
+        const trophyMap = new Map(
+          gameDataResponse.trophies.map(t => [t.trophyId, t])
+        );
+
+        const earnedTrophies = userEarnedTrophies.map(t => {
+          const staticData = trophyMap.get(t.trophyId);
+          return {
+            id: `${title.npCommunicationId}_${t.trophyId}`,
+            name: staticData?.trophyName || 'Unknown Trophy',
+            description: staticData?.trophyDetail || '',
+            unlockTime: t.earnedDateTime ? new Date(t.earnedDateTime).getTime() / 1000 : null,
+            gameName: title.trophyTitleName || 'Unknown Game',
+            gameId: title.npCommunicationId,
+            type: t.trophyType,
+            rarity: t.trophyEarnedRate,
+            icon: staticData?.trophyIconUrl || null
+          };
+        });
 
         newTrophies.push(...earnedTrophies);
       } catch (err) {

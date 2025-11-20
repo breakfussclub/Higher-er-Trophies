@@ -6,7 +6,8 @@ import {
   getUserTrophyProfileSummary,
   getProfileFromAccountId,
   getUserTitles,
-  getUserTrophiesEarnedForTitle
+  getUserTrophiesEarnedForTitle,
+  getTitleTrophies
 } from 'psn-api';
 
 let authCache = {
@@ -250,6 +251,27 @@ export async function getPSNTitleTrophies(accountId, npCommunicationId, trophyGr
   } catch (error) {
     // Some games might not have trophies or might error out, just log and return null
     console.error(`[PSN] Error fetching trophies for title ${npCommunicationId}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Get static trophy data for a title (names, descriptions, icons)
+ * @param {string} npCommunicationId - Game's NP Communication ID
+ * @param {string} trophyGroupId - Trophy Group ID (usually "default")
+ * @returns {Promise} List of all trophies for the title
+ */
+export async function getPSNGameTrophies(npCommunicationId, trophyGroupId = 'default') {
+  try {
+    const authorization = await getAuthorization();
+    const response = await getTitleTrophies(
+      authorization,
+      npCommunicationId,
+      trophyGroupId
+    );
+    return response;
+  } catch (error) {
+    console.error(`[PSN] Error fetching game trophies for ${npCommunicationId}:`, error.message);
     return null;
   }
 }

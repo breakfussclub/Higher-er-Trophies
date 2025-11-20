@@ -187,7 +187,8 @@ export async function getRecentAchievements(xuid) {
  */
 export async function getTitleAchievements(titleId, xuid) {
   try {
-    const data = await openXBLRequest(`/achievements/title/${titleId}/${xuid}`);
+    // Correct endpoint: /achievements/player/{xuid}/title/{titleId}
+    const data = await openXBLRequest(`/achievements/player/${xuid}/title/${titleId}`);
     return data;
   } catch (error) {
     console.log(`Title achievements endpoint failed for ${titleId}: ${error.message}`);

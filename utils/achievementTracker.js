@@ -221,41 +221,10 @@ async function getXboxAchievementsData(gamertag) {
     const xuid = searchResult.xuid;
     console.log(`[Xbox] Found XUID: ${xuid}`);
 
-    // Try the recent achievements endpoint first - it often works better
-    console.log(`[Xbox] Trying recent achievements endpoint...`);
-    let achievements = await getRecentAchievements(xuid);
-
-    // Log the response structure
-    console.log(`[Xbox] Recent achievements response structure:`, Object.keys(achievements));
-
-    // If recent achievements has items, use that
-    if (achievements?.items && achievements.items.length > 0) {
-      console.log(`[Xbox] Found ${achievements.items.length} recent achievements`);
-
-      const newAchievements = achievements.items.map(item => {
-        // Recent achievements endpoint has a different structure
-        const achievement = item.achievement || item;
-        const title = item.titleInfo || {};
-
-        return {
-          id: `${title.titleId || 'unknown'}_${achievement.id || achievement.achievementId}`,
-          name: achievement.name || achievement.achievementName || 'Unknown Achievement',
-          description: achievement.description || achievement.achievementDescription || '',
-          unlockTime: achievement.timeUnlocked ? new Date(achievement.timeUnlocked).getTime() / 1000 : null,
-          gameName: title.name || title.titleName || 'Unknown Game',
-          gameId: title.titleId || title.id,
-          gamerscore: achievement.rewards?.[0]?.value || achievement.gamerscore || 0,
-          icon: achievement.mediaAssets?.[0]?.url || achievement.imageUrl || null
-        };
-      });
-
-      console.log(`[Xbox] Processed ${newAchievements.length} recent achievements`);
-      return newAchievements;
-    }
-
-    // Fallback to player achievements endpoint
-    console.log(`[Xbox] Recent achievements empty, trying player achievements endpoint...`);
-    achievements = await getXboxAchievements(xuid);
+    // Skip broken recent achievements endpoint and go straight to player achievements
+    // The recent achievements endpoint (v2) seems to be unstable or requires different params
+    console.log(`[Xbox] Fetching player achievements (titles)...`);
+    let achievements = await getXboxAchievements(xuid);
 
     // Parse achievement data if available
     if (!achievements?.titles || achievements.titles.length === 0) {
@@ -265,9 +234,21 @@ async function getXboxAchievementsData(gamertag) {
     }
 
     console.log(`[Xbox] Found ${achievements.titles.length} titles with potential achievements`);
+
+    // Sort titles by last played/unlocked to ensure we check the most relevant ones
+    if (achievements.titles.length > 0) {
+      console.log('[Xbox] First title keys:', Object.keys(achievements.titles[0]));
+    }
+
+    const sortedTitles = achievements.titles.sort((a, b) => {
+      const timeA = new Date(a.lastUnlock || a.lastPlayed || 0).getTime();
+      const timeB = new Date(b.lastUnlock || b.lastPlayed || 0).getTime();
+      return timeB - timeA;
+    });
+
     const newAchievements = [];
 
-    for (const title of achievements.titles.slice(0, 5)) { // Top 5 games
+    for (const title of sortedTitles.slice(0, 5)) { // Top 5 games
       try {
         console.log(`[Xbox] Processing title: ${title.name || title.titleName || 'Unknown'} (ID: ${title.titleId})`);
 

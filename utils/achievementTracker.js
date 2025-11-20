@@ -221,11 +221,46 @@ async function getXboxAchievementsData(gamertag) {
     const xuid = searchResult.xuid;
     console.log(`[Xbox] Found XUID: ${xuid}`);
 
-    const achievements = await getXboxAchievements(xuid);
+    // Try the recent achievements endpoint first - it often works better
+    console.log(`[Xbox] Trying recent achievements endpoint...`);
+    let achievements = await getRecentAchievements(xuid);
+
+    // Log the response structure
+    console.log(`[Xbox] Recent achievements response structure:`, Object.keys(achievements));
+
+    // If recent achievements has items, use that
+    if (achievements?.items && achievements.items.length > 0) {
+      console.log(`[Xbox] Found ${achievements.items.length} recent achievements`);
+
+      const newAchievements = achievements.items.map(item => {
+        // Recent achievements endpoint has a different structure
+        const achievement = item.achievement || item;
+        const title = item.titleInfo || {};
+
+        return {
+          id: `${title.titleId || 'unknown'}_${achievement.id || achievement.achievementId}`,
+          name: achievement.name || achievement.achievementName || 'Unknown Achievement',
+          description: achievement.description || achievement.achievementDescription || '',
+          unlockTime: achievement.timeUnlocked ? new Date(achievement.timeUnlocked).getTime() / 1000 : null,
+          gameName: title.name || title.titleName || 'Unknown Game',
+          gameId: title.titleId || title.id,
+          gamerscore: achievement.rewards?.[0]?.value || achievement.gamerscore || 0,
+          icon: achievement.mediaAssets?.[0]?.url || achievement.imageUrl || null
+        };
+      });
+
+      console.log(`[Xbox] Processed ${newAchievements.length} recent achievements`);
+      return newAchievements;
+    }
+
+    // Fallback to player achievements endpoint
+    console.log(`[Xbox] Recent achievements empty, trying player achievements endpoint...`);
+    achievements = await getXboxAchievements(xuid);
 
     // Parse achievement data if available
     if (!achievements?.titles || achievements.titles.length === 0) {
       console.log('[Xbox] No Xbox titles/achievements found in response');
+      console.log('[Xbox] This may be due to API tier limitations or privacy settings');
       return [];
     }
 
@@ -299,6 +334,7 @@ async function getXboxAchievementsData(gamertag) {
     return newAchievements;
   } catch (error) {
     console.error('[Xbox] Error fetching Xbox achievements:', error.message);
+    console.error('[Xbox] Full error:', error);
     return [];
   }
 }

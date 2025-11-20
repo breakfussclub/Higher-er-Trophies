@@ -38,6 +38,13 @@ export async function formatAchievementDigest(newAchievements, client) {
     if (achievements.steam && achievements.steam.length > 0) {
       hasContent = true;
 
+      // Set thumbnail to the most recent game's icon (if not already set by PSN)
+      if (!mainEmbed.data.thumbnail && achievements.steam[0].gameId) {
+        // Steam game icons are available at: https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/header.jpg
+        const steamIconUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${achievements.steam[0].gameId}/header.jpg`;
+        mainEmbed.setThumbnail(steamIconUrl);
+      }
+
       const steamField = achievements.steam
         .slice(0, 5) // Limit to 5 per user to avoid embed size limits
         .map(a => {

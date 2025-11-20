@@ -34,11 +34,11 @@ async function openXBLRequest(endpoint) {
 function parseSettings(settings) {
   const parsed = {};
   if (!settings || !Array.isArray(settings)) return parsed;
-  
+
   settings.forEach(setting => {
     parsed[setting.id] = setting.value;
   });
-  
+
   return parsed;
 }
 
@@ -118,14 +118,14 @@ export async function getXboxAchievements(xuid) {
     return data;
   } catch (error) {
     console.log(`Primary achievements endpoint failed: ${error.message}`);
-    
+
     // Fallback 1: Try title-based achievements (requires title ID)
     try {
       const data = await openXBLRequest(`/achievements/x360/${xuid}`);
       return data;
     } catch (fallbackError) {
       console.log(`Fallback achievements endpoint failed: ${fallbackError.message}`);
-      
+
       // Fallback 2: Return empty structure to prevent crashes
       // OpenXBL free tier may not support achievement endpoints
       console.log('Xbox achievement tracking unavailable - API tier limitation or endpoint changed');
@@ -176,5 +176,21 @@ export async function getRecentAchievements(xuid) {
   } catch (error) {
     console.log(`Recent achievements endpoint failed: ${error.message}`);
     return { items: [] };
+  }
+}
+
+/**
+ * Get achievements for a specific title
+ * @param {string} titleId - Xbox Title ID
+ * @param {string} xuid - Xbox User ID
+ * @returns {Promise<Object>} Title achievements
+ */
+export async function getTitleAchievements(titleId, xuid) {
+  try {
+    const data = await openXBLRequest(`/achievements/title/${titleId}/${xuid}`);
+    return data;
+  } catch (error) {
+    console.log(`Title achievements endpoint failed for ${titleId}: ${error.message}`);
+    return { achievements: [] };
   }
 }

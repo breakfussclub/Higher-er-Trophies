@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { getAllUsers } from './userData.js';
 import { getSteamProfile, getPlayerAchievements, getAchievementSchema, getSteamGames } from './steamAPI.js';
 import { getPSNProfile, getPSNUserTitles, getPSNTitleTrophies, getPSNGameTrophies } from './psnAPI.js';
-import { getXboxProfile, searchGamertag, getXboxAchievements, getRecentAchievements } from './xboxAPI.js';
+import { getXboxProfile, searchGamertag, getXboxAchievements, getRecentAchievements, getTitleAchievements } from './xboxAPI.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -268,41 +268,45 @@ async function getXboxAchievementsData(gamertag) {
     const newAchievements = [];
 
     for (const title of achievements.titles.slice(0, 5)) { // Top 5 games
-      console.log(`[Xbox] Processing title: ${title.name || title.titleName || 'Unknown'}`);
+      try {
+        console.log(`[Xbox] Processing title: ${title.name || title.titleName || 'Unknown'} (ID: ${title.titleId})`);
 
-      // Handle different response structures
-      let achievementList = [];
+        // The player achievements endpoint only returns summary stats
+        // We need to fetch individual achievements for this specific title
+        console.log(`[Xbox] Fetching individual achievements for title ${title.titleId}...`);
+        const titleAchievements = await getTitleAchievements(title.titleId, xuid);
 
-      // Check if currentAchievements exists AND is an array
-      if (Array.isArray(title.achievement?.currentAchievements)) {
-        achievementList = title.achievement.currentAchievements;
-        console.log(`[Xbox] Found ${achievementList.length} achievements in currentAchievements`);
-      } else if (Array.isArray(title.achievements)) {
-        achievementList = title.achievements;
-        console.log(`[Xbox] Found ${achievementList.length} achievements in achievements array`);
-      } else if (Array.isArray(title.achievement)) {
-        achievementList = title.achievement;
-        console.log(`[Xbox] Found ${achievementList.length} achievements in achievement array`);
-      } else {
-        // Log what we actually have for debugging
-        if (title.achievement) {
-          console.log(`[Xbox] title.achievement exists but is not an array. Type:`, typeof title.achievement);
-          console.log(`[Xbox] title.achievement structure:`, Object.keys(title.achievement));
-          if (title.achievement.currentAchievements !== undefined) {
-            console.log(`[Xbox] currentAchievements type:`, typeof title.achievement.currentAchievements);
-          }
+        console.log(`[Xbox] Title achievements response structure:`, Object.keys(titleAchievements));
+
+        if (!titleAchievements?.achievements || !Array.isArray(titleAchievements.achievements)) {
+          console.log(`[Xbox] No achievements array found for title ${title.name}`);
+          continue;
         }
-        console.log(`[Xbox] No valid achievement array found for title`);
-      }
 
-      // Only process if we have an array
-      if (Array.isArray(achievementList) && achievementList.length > 0) {
+        console.log(`[Xbox] Found ${titleAchievements.achievements.length} total achievements for ${title.name}`);
+
+        // Filter to only unlocked achievements
+        const unlockedAchievements = titleAchievements.achievements.filter(a => {
+          // Check various fields that might indicate unlock status
+          return a.progressState === 'Achieved' ||
+            a.progression?.achieved === true ||
+            a.achieved === true ||
+            a.timeUnlocked;
+        });
+
+        console.log(`[Xbox] Found ${unlockedAchievements.length} unlocked achievements`);
+
+        if (unlockedAchievements.length === 0) {
+          console.log(`[Xbox] No unlocked achievements for ${title.name}, skipping`);
+          continue;
+        }
+
         // Log first achievement structure for debugging
-        if (achievementList[0]) {
-          console.log(`[Xbox] Sample achievement structure:`, Object.keys(achievementList[0]));
+        if (unlockedAchievements[0]) {
+          console.log(`[Xbox] Sample unlocked achievement structure:`, Object.keys(unlockedAchievements[0]));
         }
 
-        const titleAchievements = achievementList.map(a => {
+        const processedAchievements = unlockedAchievements.map(a => {
           // Try multiple field names for achievement name
           const achievementName = a.name || a.achievementName || a.title || a.displayName || 'Unknown Achievement';
 
@@ -310,10 +314,10 @@ async function getXboxAchievementsData(gamertag) {
           const achievementDesc = a.description || a.achievementDescription || a.unlockedDescription || a.lockedDescription || '';
 
           // Try multiple field names for unlock time
-          const unlockTime = a.timeUnlocked || a.unlockTime || a.progressState?.timeUnlocked;
+          const unlockTime = a.timeUnlocked || a.unlockTime || a.progression?.timeUnlocked;
 
           // Try multiple field names for gamerscore
-          const gamerscore = a.rewards?.[0]?.value || a.gamerscore || a.rewardsValue || 0;
+          const gamerscore = a.rewards?.[0]?.value || a.gamerscore || a.rewardsValue || a.value || 0;
 
           // Try multiple field names for icon
           const icon = a.mediaAssets?.[0]?.url || a.imageUrl || a.icon || a.titleAssociations?.[0]?.imageUrl || null;
@@ -334,8 +338,10 @@ async function getXboxAchievementsData(gamertag) {
           };
         });
 
-        console.log(`[Xbox] Processed ${titleAchievements.length} achievements for ${title.name || title.titleName}`);
-        newAchievements.push(...titleAchievements);
+        console.log(`[Xbox] Processed ${processedAchievements.length} achievements for ${title.name || title.titleName}`);
+        newAchievements.push(...processedAchievements);
+      } catch (err) {
+        console.error(`[Xbox] Error processing title ${title.name}:`, err.message);
       }
     }
 

@@ -121,17 +121,19 @@ async function getPSNTrophies(psnId) {
 
         const earnedTrophies = trophiesResponse.trophies
           .filter(t => t.earned)
-          .map(t => ({
-            id: `${title.npCommunicationId}_${t.trophyId}`,
-            name: t.trophyName || 'Unknown Trophy',
-            description: t.trophyDetail || '',
-            unlockTime: t.earnedDateTime ? new Date(t.earnedDateTime).getTime() / 1000 : null,
-            gameName: title.trophyTitleName || 'Unknown Game',
-            gameId: title.npCommunicationId,
-            type: t.trophyType,
-            rarity: t.trophyEarnedRate,
-            icon: t.trophyIconUrl || null
-          }));
+          .map((t, index) => {
+            if (index === 0) console.log('DEBUG TROPHY:', JSON.stringify(t, null, 2));
+            return {
+              id: `${title.npCommunicationId}_${t.trophyId}`,
+              name: t.trophyName || 'Unknown Trophy',
+              description: t.trophyDetail || '',
+              unlockTime: t.earnedDateTime ? new Date(t.earnedDateTime).getTime() / 1000 : null,
+              gameName: title.trophyTitleName || 'Unknown Game',
+              gameId: title.npCommunicationId,
+              type: t.trophyType,
+              rarity: t.trophyEarnedRate,
+              icon: t.trophyIconUrl || null
+            }));
 
         newTrophies.push(...earnedTrophies);
       } catch (err) {

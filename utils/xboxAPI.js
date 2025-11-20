@@ -18,7 +18,7 @@ async function openXBLRequest(endpoint) {
 
   if (!response.ok) {
     const error = await response.text();
-    console.error(`OpenXBL API error (${response.status}):`, error);
+    console.error(`OpenXBL API error (${response.status}) for ${endpoint}:`, error);
     throw new Error(`OpenXBL API error: ${response.status} - ${error}`);
   }
 
@@ -187,6 +187,9 @@ export async function getRecentAchievements(xuid) {
  */
 export async function getTitleAchievements(titleId, xuid) {
   try {
+    if (!xuid || !titleId) {
+      throw new Error(`Invalid parameters: xuid=${xuid}, titleId=${titleId}`);
+    }
     // Correct endpoint: /achievements/player/{xuid}/title/{titleId}
     const data = await openXBLRequest(`/achievements/player/${xuid}/title/${titleId}`);
     return data;

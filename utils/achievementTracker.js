@@ -311,7 +311,17 @@ async function getXboxAchievementsData(gamertag) {
             id: `${title.titleId}_${a.id || a.achievementId || a.name}`,
             name: achievementName,
             description: achievementDesc,
-            unlockTime: unlockTime ? new Date(unlockTime).getTime() / 1000 : null,
+            unlockTime: (() => {
+              if (!unlockTime) return null;
+              const date = new Date(unlockTime);
+              // Filter out dates before 2005 (Xbox 360 launch)
+              // This fixes the "23 years ago" issue where default dates (e.g. 2002) are returned
+              if (date.getFullYear() < 2005) {
+                console.log(`[Xbox] Ignored invalid unlock date: ${unlockTime} (${date.toISOString()}) for ${achievementName}`);
+                return null;
+              }
+              return date.getTime() / 1000;
+            })(),
             gameName: title.name || title.titleName || 'Unknown Game',
             gameId: title.titleId || title.id,
             gamerscore: gamerscore,

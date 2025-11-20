@@ -44,8 +44,12 @@ function writeAchievementData(data) {
  */
 async function getSteamAchievements(steamId) {
   try {
+    console.log(`[Steam] Fetching games for Steam ID: ${steamId}`);
     const games = await getSteamGames(steamId);
-    if (!games.games || games.games.length === 0) return [];
+    if (!games.games || games.games.length === 0) {
+      console.log('[Steam] No games found');
+      return [];
+    }
 
     const newAchievements = [];
 
@@ -54,21 +58,59 @@ async function getSteamAchievements(steamId) {
       .sort((a, b) => b.playtime_forever - a.playtime_forever)
       .slice(0, 5);
 
+    console.log(`[Steam] Checking achievements for top ${topGames.length} games`);
+
     for (const game of topGames) {
       try {
+        console.log(`[Steam] Fetching achievements for: ${game.name} (${game.appid})`);
+
         const achievements = await getPlayerAchievements(steamId, game.appid);
         const schema = await getAchievementSchema(game.appid);
 
-        if (!achievements?.achievements || !schema?.availableGameStats?.achievements) continue;
+        // Log what we received
+        console.log(`[Steam] ${game.name} - Player achievements:`, achievements?.achievements ? `${achievements.achievements.length} total` : 'none');
+        console.log(`[Steam] ${game.name} - Schema achievements:`, schema?.availableGameStats?.achievements ? `${schema.availableGameStats.achievements.length} total` : 'none');
 
+        if (!achievements?.achievements) {
+          console.log(`[Steam] ${game.name} - No player achievement data, skipping`);
+          continue;
+        }
+
+        if (!schema?.availableGameStats?.achievements) {
+          console.log(`[Steam] ${game.name} - No schema data available, using basic info only`);
+
+          // Still process achievements even without schema, use basic info
+          const unlockedAchievements = achievements.achievements
+            .filter(a => a.achieved === 1)
+            .map(a => ({
+              id: `${game.appid}_${a.apiname}`,
+              name: a.apiname, // Use API name as fallback
+              description: 'Achievement unlocked', // Generic description
+              unlockTime: a.unlocktime,
+              gameName: game.name,
+              gameId: game.appid,
+              icon: null
+            }));
+
+          console.log(`[Steam] ${game.name} - Found ${unlockedAchievements.length} unlocked achievements (no schema)`);
+          newAchievements.push(...unlockedAchievements);
+          continue;
+        }
+
+        // Process with full schema data
         const unlockedAchievements = achievements.achievements
           .filter(a => a.achieved === 1)
           .map(a => {
             const details = schema.availableGameStats.achievements.find(s => s.name === a.apiname);
+
+            if (!details) {
+              console.log(`[Steam] ${game.name} - No schema details for achievement: ${a.apiname}`);
+            }
+
             return {
               id: `${game.appid}_${a.apiname}`,
               name: details?.displayName || a.apiname,
-              description: details?.description || '',
+              description: details?.description || 'Achievement unlocked',
               unlockTime: a.unlocktime,
               gameName: game.name,
               gameId: game.appid,
@@ -76,15 +118,18 @@ async function getSteamAchievements(steamId) {
             };
           });
 
+        console.log(`[Steam] ${game.name} - Found ${unlockedAchievements.length} unlocked achievements with details`);
         newAchievements.push(...unlockedAchievements);
+
       } catch (err) {
-        console.log(`Could not fetch achievements for game ${game.appid}:`, err.message);
+        console.error(`[Steam] Error fetching achievements for ${game.name} (${game.appid}):`, err.message);
       }
     }
 
+    console.log(`[Steam] Total achievements found: ${newAchievements.length}`);
     return newAchievements;
   } catch (error) {
-    console.error('Error fetching Steam achievements:', error.message);
+    console.error('[Steam] Error fetching Steam achievements:', error.message);
     return [];
   }
 }
@@ -171,52 +216,89 @@ async function getPSNTrophies(psnId) {
  */
 async function getXboxAchievementsData(gamertag) {
   try {
+    console.log(`[Xbox] Searching for gamertag: ${gamertag}`);
     const searchResult = await searchGamertag(gamertag);
     const xuid = searchResult.xuid;
+    console.log(`[Xbox] Found XUID: ${xuid}`);
 
     const achievements = await getXboxAchievements(xuid);
 
     // Parse achievement data if available
     if (!achievements?.titles || achievements.titles.length === 0) {
-      console.log('No Xbox titles/achievements found in response');
+      console.log('[Xbox] No Xbox titles/achievements found in response');
       return [];
     }
 
+    console.log(`[Xbox] Found ${achievements.titles.length} titles with potential achievements`);
     const newAchievements = [];
 
     for (const title of achievements.titles.slice(0, 5)) { // Top 5 games
+      console.log(`[Xbox] Processing title: ${title.name || title.titleName || 'Unknown'}`);
+
       // Handle different response structures
       let achievementList = [];
 
       if (title.achievement?.currentAchievements) {
         achievementList = title.achievement.currentAchievements;
+        console.log(`[Xbox] Found ${achievementList.length} achievements in currentAchievements`);
       } else if (title.achievements) {
         achievementList = title.achievements;
+        console.log(`[Xbox] Found ${achievementList.length} achievements in achievements array`);
       } else if (Array.isArray(title.achievement)) {
         achievementList = title.achievement;
+        console.log(`[Xbox] Found ${achievementList.length} achievements in achievement array`);
+      } else {
+        console.log(`[Xbox] No achievements found for title, structure:`, Object.keys(title));
       }
 
       // Only process if we have an array
       if (Array.isArray(achievementList) && achievementList.length > 0) {
-        const titleAchievements = achievementList.map(a => ({
-          id: `${title.titleId}_${a.id || a.achievementId || a.name}`,
-          name: a.name || a.achievementName || 'Unknown Achievement',
-          description: a.description || a.achievementDescription || '',
-          unlockTime: a.timeUnlocked ? new Date(a.timeUnlocked).getTime() / 1000 : null,
-          gameName: title.name || title.titleName || 'Unknown Game',
-          gameId: title.titleId || title.id,
-          gamerscore: a.rewards?.[0]?.value || a.gamerscore || 0,
-          icon: a.mediaAssets?.[0]?.url || a.imageUrl || null
-        }));
+        // Log first achievement structure for debugging
+        if (achievementList[0]) {
+          console.log(`[Xbox] Sample achievement structure:`, Object.keys(achievementList[0]));
+        }
 
+        const titleAchievements = achievementList.map(a => {
+          // Try multiple field names for achievement name
+          const achievementName = a.name || a.achievementName || a.title || a.displayName || 'Unknown Achievement';
+
+          // Try multiple field names for description
+          const achievementDesc = a.description || a.achievementDescription || a.unlockedDescription || a.lockedDescription || '';
+
+          // Try multiple field names for unlock time
+          const unlockTime = a.timeUnlocked || a.unlockTime || a.progressState?.timeUnlocked;
+
+          // Try multiple field names for gamerscore
+          const gamerscore = a.rewards?.[0]?.value || a.gamerscore || a.rewardsValue || 0;
+
+          // Try multiple field names for icon
+          const icon = a.mediaAssets?.[0]?.url || a.imageUrl || a.icon || a.titleAssociations?.[0]?.imageUrl || null;
+
+          if (achievementName === 'Unknown Achievement') {
+            console.log(`[Xbox] Could not find name for achievement, available fields:`, Object.keys(a));
+          }
+
+          return {
+            id: `${title.titleId}_${a.id || a.achievementId || a.name}`,
+            name: achievementName,
+            description: achievementDesc,
+            unlockTime: unlockTime ? new Date(unlockTime).getTime() / 1000 : null,
+            gameName: title.name || title.titleName || 'Unknown Game',
+            gameId: title.titleId || title.id,
+            gamerscore: gamerscore,
+            icon: icon
+          };
+        });
+
+        console.log(`[Xbox] Processed ${titleAchievements.length} achievements for ${title.name || title.titleName}`);
         newAchievements.push(...titleAchievements);
       }
     }
 
-    console.log(`Found ${newAchievements.length} Xbox achievements for ${gamertag}`);
+    console.log(`[Xbox] Total achievements found: ${newAchievements.length}`);
     return newAchievements;
   } catch (error) {
-    console.error('Error fetching Xbox achievements:', error.message);
+    console.error('[Xbox] Error fetching Xbox achievements:', error.message);
     return [];
   }
 }

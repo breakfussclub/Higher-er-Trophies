@@ -55,6 +55,12 @@ export async function getPlayerAchievements(steamId, appId) {
   const url = `${STEAM_API_BASE}/ISteamUserStats/GetPlayerAchievements/v1/?appid=${appId}&key=${config.steam.apiKey}&steamid=${steamId}`;
   const response = await fetch(url);
   const data = await response.json();
+
+  // Check if the game has achievements
+  if (!response.ok || !data.playerstats?.success) {
+    throw new Error(`Game ${appId} does not support achievements or stats are private`);
+  }
+
   return data.playerstats;
 }
 
@@ -63,5 +69,11 @@ export async function getAchievementSchema(appId) {
   const url = `${STEAM_API_BASE}/ISteamUserStats/GetSchemaForGame/v2/?key=${config.steam.apiKey}&appid=${appId}`;
   const response = await fetch(url);
   const data = await response.json();
+
+  // Check if schema is available
+  if (!response.ok || !data.game) {
+    throw new Error(`No achievement schema available for game ${appId}`);
+  }
+
   return data.game;
 }

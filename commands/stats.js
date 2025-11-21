@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { getUser } from '../utils/userData.js';
+import { query } from '../database/db.js';
 import { getSteamStats } from '../platformStats/steamStats.js';
 import { getPSNStats } from '../platformStats/psnStats.js';
 import { getXboxStats } from '../platformStats/xboxStats.js';
@@ -27,9 +27,21 @@ export default {
 
     const targetUser = interaction.options.getUser('user') || interaction.user;
     const platform = interaction.options.getString('platform') || 'all';
-    const userData = getUser(targetUser.id);
 
-    if (!userData || (!userData.steam && !userData.psn && !userData.xbox)) {
+    // Fetch linked accounts from database
+    const result = await query(
+      'SELECT platform, account_id, extra_data FROM linked_accounts WHERE discord_id = $1',
+      [targetUser.id]
+    );
+
+    const userData = {};
+    result.rows.forEach(row => {
+      if (row.platform === 'steam') userData.steam = row.account_id;
+      if (row.platform === 'psn') userData.psn = row.account_id;
+      if (row.platform === 'xbox') userData.xbox = row.account_id;
+    });
+
+    if (!userData.steam && !userData.psn && !userData.xbox) {
       return await interaction.editReply({
         content: `❌ ${targetUser.username} has no linked gaming accounts. Use /link to link accounts.`
       });

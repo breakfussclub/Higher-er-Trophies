@@ -22,10 +22,12 @@ export async function postDailyDigest(client) {
     try {
         // 1. Fetch achievements unlocked in the last 24 hours
         const { rows: recentUnlocks } = await query(`
-            SELECT a.discord_id, a.platform, a.game_id, a.achievement_id, u.username
+            SELECT a.discord_id, a.platform, a.game_id, a.achievement_id, u.username,
+                   a.achievement_name, a.description, a.game_name, a.icon_url
             FROM achievements a
             JOIN linked_accounts u ON a.discord_id = u.discord_id AND a.platform = u.platform
             WHERE a.detected_at > NOW() - INTERVAL '24 hours'
+            ORDER BY u.username, a.game_name, a.detected_at DESC
         `);
 
         const embed = new EmbedBuilder()
@@ -35,27 +37,54 @@ export async function postDailyDigest(client) {
             .setTimestamp()
             .setFooter({ text: 'Higher-er Trophies • Daily Update' });
 
-        // Group by User -> Game
         if (recentUnlocks.length > 0) {
             const userStats = {};
 
+            // Group by User -> Game
             for (const unlock of recentUnlocks) {
                 if (!userStats[unlock.username]) {
-                    userStats[unlock.username] = { count: 0, games: new Set() };
+                    userStats[unlock.username] = {};
                 }
-                userStats[unlock.username].count++;
-                userStats[unlock.username].games.add(unlock.game_id); // We might want game names here ideally, but ID is what we have in this table
+                const gameName = unlock.game_name || unlock.game_id;
+                if (!userStats[unlock.username][gameName]) {
+                    userStats[unlock.username][gameName] = [];
+                }
+
+                // Add achievement details
+                userStats[unlock.username][gameName].push({
+                    name: unlock.achievement_name || 'Unknown Achievement',
+                    desc: unlock.description
+                });
             }
 
-            const recapLines = Object.entries(userStats).map(([username, stats]) => {
-                return `**${username}** unlocked **${stats.count}** achievements across ${stats.games.size} game(s).`;
-            });
+            // Build the embed fields
+            for (const [username, games] of Object.entries(userStats)) {
+                let userField = '';
 
-            embed.addFields({
-                name: '🔥 Yesterday\'s Activity',
-                value: recapLines.join('\n'),
-                inline: false
-            });
+                for (const [gameName, achievements] of Object.entries(games)) {
+                    const count = achievements.length;
+                    const shown = achievements.slice(0, 5); // Show max 5 per game
+                    const remaining = count - 5;
+
+                    userField += `**${gameName}** (${count} new)\n`;
+
+                    shown.forEach(ach => {
+                        userField += `> 🏆 **${ach.name}**\n`;
+                    });
+
+                    if (remaining > 0) {
+                        userField += `> ...and ${remaining} more.\n`;
+                    }
+                    userField += '\n';
+                }
+
+                embed.addFields({
+                    name: `🎮 ${username}'s Activity`,
+                    value: userField.substring(0, 1024), // Discord limit
+                    inline: false
+                });
+            }
+
         } else {
             embed.addFields({
                 name: '🔥 Yesterday\'s Activity',

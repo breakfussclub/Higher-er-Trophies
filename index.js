@@ -43,11 +43,16 @@ for (const file of commandFiles) {
   }
 }
 
+import { initializeDatabase } from './database/schema.js';
+
 // Register slash commands
 const rest = new REST({ version: '10' }).setToken(config.discord.token);
 
 (async () => {
   try {
+    // Initialize Database Schema
+    await initializeDatabase();
+
     logger.info(`Started refreshing ${commands.length} application (/) commands.`);
 
     const data = await rest.put(
@@ -57,7 +62,7 @@ const rest = new REST({ version: '10' }).setToken(config.discord.token);
 
     logger.info(`Successfully reloaded ${data.length} application (/) commands.`);
   } catch (error) {
-    logger.error('Error registering commands:', error);
+    logger.error('Error initializing app:', error);
   }
 })();
 

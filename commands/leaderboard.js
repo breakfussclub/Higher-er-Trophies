@@ -201,22 +201,48 @@ export async function generateGlobalLeaderboard(embed, isSummary = false) {
 
         return {
             username: user.username || 'Unknown',
-            score: totalScore
+            score: totalScore,
+            breakdown: {
+                xbox: accounts.xbox ? parseInt(accounts.xbox.gamerscore || 0) : 0,
+                psn: accounts.psn ? (accounts.psn.trophyLevel || 0) : 0,
+                steam: accounts.steam ? (accounts.steam.steamLevel || 0) : 0
+            }
         };
     }).sort((a, b) => b.score - a.score);
 
-    const top = isSummary ? ranked.slice(0, 3) : ranked.slice(0, 10);
+    const top = isSummary ? ranked.slice(0, 5) : ranked.slice(0, 15); // Show top 5 in summary, 15 in full
 
     if (top.length === 0) {
         if (!isSummary) embed.setDescription('No accounts linked yet.');
         return;
     }
 
-    const fieldName = isSummary ? '🌍 Global Top 3' : '🌍 Global Leaderboard';
-    const fieldValue = top.map((user, index) => {
-        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-        return `${medal} **${user.username}** — ${user.score.toLocaleString()} pts`;
-    }).join('\n');
+    // Build Table
+    // Columns: Rank | User | XB | PS | St | Total
+    // We need to pad strings to align them.
 
-    embed.addFields({ name: fieldName, value: fieldValue, inline: false });
+    let table = '```\n';
+    table += 'Rank | User           | XB      | PS   | St   | Total  \n';
+    table += '-----|----------------|---------|------|------|--------\n';
+
+    top.forEach((user, index) => {
+        const rank = (index + 1).toString().padEnd(4);
+        const name = user.username.substring(0, 14).padEnd(14); // Truncate to 14 chars
+
+        // Format numbers (e.g. 12.5k) to save space if needed, but for now let's try full numbers
+        const xb = user.breakdown.xbox.toString().padEnd(7);
+        const ps = user.breakdown.psn.toString().padEnd(4); // Level
+        const st = user.breakdown.steam.toString().padEnd(4); // Level
+        const total = user.score.toLocaleString().padEnd(6);
+
+        table += `${rank} | ${name} | ${xb} | ${ps} | ${st} | ${total}\n`;
+    });
+
+    table += '```';
+
+    // Legend
+    const legend = '`XB`: Gamerscore • `PS`: Trophy Level • `St`: Steam Level';
+
+    const fieldName = isSummary ? '🌍 Global Leaderboard' : '🌍 Global Leaderboard (Top 15)';
+    embed.addFields({ name: fieldName, value: table + '\n' + legend, inline: false });
 }

@@ -61,12 +61,29 @@ async function isAchievementLogged(discordId, platform, gameId, achievementId) {
 /**
  * Log achievement to DB
  */
-async function logAchievement(discordId, platform, gameId, achievementId, unlockedAt) {
+async function logAchievement(discordId, platform, gameId, achievementId, unlockedAt, details = {}) {
+    const { name, description, gameName, iconUrl } = details;
+
     await query(
-        `INSERT INTO achievements (discord_id, platform, game_id, achievement_id, unlocked_at)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (discord_id, platform, game_id, achievement_id) DO NOTHING`,
-        [discordId, platform, gameId.toString(), achievementId.toString(), unlockedAt ? new Date(unlockedAt * 1000) : null]
+        `INSERT INTO achievements (discord_id, platform, game_id, achievement_id, unlocked_at, achievement_name, description, game_name, icon_url)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT (discord_id, platform, game_id, achievement_id) 
+     DO UPDATE SET 
+        achievement_name = EXCLUDED.achievement_name,
+        description = EXCLUDED.description,
+        game_name = EXCLUDED.game_name,
+        icon_url = EXCLUDED.icon_url`,
+        [
+            discordId,
+            platform,
+            gameId.toString(),
+            achievementId.toString(),
+            unlockedAt ? new Date(unlockedAt * 1000) : null,
+            name || null,
+            description || null,
+            gameName || null,
+            iconUrl || null
+        ]
     );
 }
 
@@ -128,7 +145,12 @@ async function checkSteam(discordId, steamAccount) {
                     });
 
                     // Log it
-                    await logAchievement(discordId, 'steam', game.appid, ach.apiname, ach.unlocktime);
+                    await logAchievement(discordId, 'steam', game.appid, ach.apiname, ach.unlocktime, {
+                        name: details?.displayName || ach.apiname,
+                        description: details?.description || 'Achievement unlocked',
+                        gameName: game.name,
+                        iconUrl: details?.icon || null
+                    });
                 }
             }
         }
@@ -212,7 +234,12 @@ async function checkPSN(discordId, psnAccount) {
                         icon: staticData?.trophyIconUrl || null
                     });
 
-                    await logAchievement(discordId, 'psn', title.npCommunicationId, trophy.trophyId, newTrophies[newTrophies.length - 1].unlockTime);
+                    await logAchievement(discordId, 'psn', title.npCommunicationId, trophy.trophyId, newTrophies[newTrophies.length - 1].unlockTime, {
+                        name: staticData?.trophyName || 'Unknown Trophy',
+                        description: staticData?.trophyDetail || '',
+                        gameName: title.trophyTitleName || 'Unknown Game',
+                        iconUrl: staticData?.trophyIconUrl || null
+                    });
                 }
             }
         }
@@ -307,7 +334,12 @@ async function checkXbox(discordId, xboxAccount) {
                         icon: ach.mediaAssets?.[0]?.url || null
                     });
 
-                    await logAchievement(discordId, 'xbox', title.titleId, achId, validUnlockTime);
+                    await logAchievement(discordId, 'xbox', title.titleId, achId, validUnlockTime, {
+                        name: ach.name || ach.achievementName || 'Unknown Achievement',
+                        description: ach.description || ach.lockedDescription || '',
+                        gameName: title.name || title.titleName || 'Unknown Game',
+                        iconUrl: ach.mediaAssets?.[0]?.url || null
+                    });
                 }
             }
         }

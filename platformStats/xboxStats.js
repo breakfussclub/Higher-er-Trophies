@@ -1,4 +1,4 @@
-import { getXboxProfile, getXboxPresence, searchGamertag } from '../services/xboxService.js';
+import { getXboxProfile, searchGamertag } from '../services/xboxService.js';
 
 function getReputationDisplay(rep) {
   const repMap = {

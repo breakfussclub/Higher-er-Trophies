@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { unlinkAccount, getUser } from '../utils/userData.js';
+import { query } from '../database/db.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -19,16 +19,24 @@ export default {
     const platform = interaction.options.getString('platform');
     const userId = interaction.user.id;
 
-    const userData = getUser(userId);
+    // Check if account is linked
+    const checkResult = await query(
+      'SELECT * FROM linked_accounts WHERE discord_id = $1 AND platform = $2',
+      [userId, platform]
+    );
 
-    if (!userData || !userData[platform]) {
+    if (checkResult.rows.length === 0) {
       return await interaction.reply({
         content: `❌ You don't have a ${platform.toUpperCase()} account linked.`,
         ephemeral: true
       });
     }
 
-    unlinkAccount(userId, platform);
+    // Delete the link
+    await query(
+      'DELETE FROM linked_accounts WHERE discord_id = $1 AND platform = $2',
+      [userId, platform]
+    );
 
     const embed = new EmbedBuilder()
       .setColor(0xFF6B6B)

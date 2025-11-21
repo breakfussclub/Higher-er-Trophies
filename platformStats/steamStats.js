@@ -6,7 +6,7 @@ import {
   getRecentlyPlayedGames,
   getPlayerAchievements,
   getAchievementSchema
-} from '../utils/steamAPI.js';
+} from '../services/steamService.js';
 
 function getGameIcon(appid, img_icon_url) {
   return `https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/${appid}/${img_icon_url}.jpg`;
@@ -37,7 +37,7 @@ export async function getSteamStats(steamId) {
     const badgesData = await getSteamBadges(steamId).catch(() => null);
     const recentGames = await getRecentlyPlayedGames(steamId).catch(() => null);
 
-    const totalPlaytime = Math.floor((steamGames.games?.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) || 0)/60);
+    const totalPlaytime = Math.floor((steamGames.games?.reduce((sum, g) => sum + (g.playtime_forever || 0), 0) || 0) / 60);
 
     // Dynamic color based on Steam Level
     let embedColor = 0x1E90FF; // Blue default

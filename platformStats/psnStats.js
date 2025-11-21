@@ -1,4 +1,4 @@
-import { getPSNProfile } from '../utils/psnAPI.js';
+import { getPSNProfile } from '../services/psnService.js';
 
 function getTrophyEmoji(type) {
   const emojis = {
@@ -29,7 +29,7 @@ export async function getPSNStats(onlineIdOrAccountId) {
   try {
     console.log(`=== FETCHING PSN STATS FOR: ${onlineIdOrAccountId} ===`);
     const profile = await getPSNProfile(onlineIdOrAccountId);
-    
+
     console.log('=== COMPLETE PROFILE DATA ===');
     console.log(JSON.stringify(profile, null, 2));
 
@@ -41,7 +41,7 @@ export async function getPSNStats(onlineIdOrAccountId) {
     // Dynamic embed color based on trophy level
     let embedColor = 0x003087; // PSN Blue default
     const level = profile.trophyLevel || 0;
-    
+
     if (level >= 500) embedColor = 0xFFD700;      // Gold
     else if (level >= 300) embedColor = 0xE5E4E2; // Platinum
     else if (level >= 200) embedColor = 0xC0C0C0; // Silver
@@ -52,7 +52,7 @@ export async function getPSNStats(onlineIdOrAccountId) {
     const silver = profile.earnedTrophies.silver || 0;
     const gold = profile.earnedTrophies.gold || 0;
     const platinum = profile.earnedTrophies.platinum || 0;
-    
+
     const totalTrophies = bronze + silver + gold + platinum;
 
     console.log(`=== TROPHY BREAKDOWN ===`);

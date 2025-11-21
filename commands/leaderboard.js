@@ -80,7 +80,7 @@ export async function generateXboxLeaderboard(embed, isSummary = false) {
         return;
     }
 
-    const fieldName = isSummary ? '<:xbox:1309308502392934442> Xbox Top 3' : '<:xbox:1309308502392934442> Xbox Leaderboard';
+    const fieldName = isSummary ? '🟢 Xbox Top 3' : '🟢 Xbox Leaderboard';
     const fieldValue = top.map((user, index) => {
         const score = user.extra_data?.gamerscore || 0;
         const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
@@ -121,7 +121,7 @@ export async function generatePSNLeaderboard(embed, isSummary = false) {
         return;
     }
 
-    const fieldName = isSummary ? '<:psn:1309308499209584691> PSN Top 3' : '<:psn:1309308499209584691> PSN Leaderboard';
+    const fieldName = isSummary ? '🔵 PSN Top 3' : '🔵 PSN Leaderboard';
     const fieldValue = top.map((user, index) => {
         const level = user.extra_data?.trophyLevel || 0;
         const trophies = user.extra_data?.earnedTrophies;
@@ -155,7 +155,7 @@ export async function generateSteamLeaderboard(embed, isSummary = false) {
         return;
     }
 
-    const fieldName = isSummary ? '💻 Steam Top 3' : '💻 Steam Leaderboard';
+    const fieldName = isSummary ? '☁️ Steam Top 3' : '☁️ Steam Leaderboard';
     const fieldValue = top.map((user, index) => {
         const level = user.extra_data?.steamLevel || 0;
         const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;

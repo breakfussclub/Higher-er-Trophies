@@ -59,7 +59,7 @@ export default {
                 const icon = score1 > score2 ? '⬅️' : (score2 > score1 ? '➡️' : '🤝');
 
                 embed.addFields({
-                    name: '<:xbox:1309308502392934442> Xbox Gamerscore',
+                    name: '🟢 Xbox Gamerscore',
                     value: `**${score1.toLocaleString()}** vs **${score2.toLocaleString()}**\n${icon} **${winner}** leads by ${Math.abs(diff).toLocaleString()}`,
                     inline: false
                 });
@@ -86,7 +86,7 @@ export default {
                 const icon = level1 > level2 ? '⬅️' : (level2 > level1 ? '➡️' : '🤝');
 
                 embed.addFields({
-                    name: '<:psn:1309308499209584691> PSN Trophies',
+                    name: '🔵 PSN Trophies',
                     value: `Level **${level1}** (${t1} 🏆) vs Level **${level2}** (${t2} 🏆)\n${icon} **${winner}** is higher level`,
                     inline: false
                 });
@@ -118,7 +118,7 @@ export default {
                 const icon = level1 > level2 ? '⬅️' : (level2 > level1 ? '➡️' : '🤝');
 
                 embed.addFields({
-                    name: '💻 Steam Level',
+                    name: '☁️ Steam Level',
                     value: `Level **${level1}** vs Level **${level2}**\n${icon} **${winner}** is higher level`,
                     inline: false
                 });

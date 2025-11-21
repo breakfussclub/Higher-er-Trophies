@@ -7,6 +7,7 @@ import config from './config.js';
 import logger from './utils/logger.js';
 import { checkNewAchievements } from './jobs/syncAchievements.js';
 import { formatAchievementDigest } from './utils/achievementFormatter.js';
+import { postDailyDigest } from './jobs/dailyDigest.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -93,6 +94,11 @@ client.once('ready', () => {
         logger.error('❌ Error in scheduled sync:', error);
       }
     });
+    // Schedule Daily Digest (Every day at 9 AM)
+    cron.schedule('0 9 * * *', async () => {
+      await postDailyDigest(client);
+    });
+
   } else {
     logger.warn('⚠️ ACHIEVEMENT_CHANNEL_ID not set. Scheduled syncs disabled.');
   }

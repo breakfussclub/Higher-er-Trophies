@@ -136,10 +136,13 @@ async function checkSteam(discordId, steamAccount) {
         // Update Steam profile info if possible (avatar, etc) - SteamService doesn't return full profile here
         // We could call getSteamProfile here to get avatar and name updates
         const profile = await SteamService.getSteamProfile(steamId);
+        const levelData = await SteamService.getSteamLevel(steamId);
+
         if (profile) {
             await updateAccountData(discordId, 'steam', {
                 avatarUrl: profile.avatarfull,
-                username: profile.personaname
+                username: profile.personaname,
+                steamLevel: levelData?.player_level || 0
             });
         }
 

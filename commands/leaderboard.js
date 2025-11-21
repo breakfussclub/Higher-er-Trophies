@@ -55,7 +55,7 @@ export default {
     }
 };
 
-async function generateXboxLeaderboard(embed, isSummary = false) {
+export async function generateXboxLeaderboard(embed, isSummary = false) {
     const { rows } = await query(`
         SELECT u.discord_id, la.username, la.extra_data
         FROM linked_accounts la
@@ -87,7 +87,7 @@ async function generateXboxLeaderboard(embed, isSummary = false) {
     embed.addFields({ name: fieldName, value: fieldValue, inline: false });
 }
 
-async function generatePSNLeaderboard(embed, isSummary = false) {
+export async function generatePSNLeaderboard(embed, isSummary = false) {
     const { rows } = await query(`
         SELECT u.discord_id, la.username, la.extra_data
         FROM linked_accounts la
@@ -130,9 +130,34 @@ async function generatePSNLeaderboard(embed, isSummary = false) {
     embed.addFields({ name: fieldName, value: fieldValue, inline: false });
 }
 
-async function generateSteamLeaderboard(embed, isSummary = false) {
-    // Placeholder for now as we don't have total achievements yet
-    if (!isSummary) {
-        embed.setDescription('Steam leaderboard coming soon! (Need to calculate total achievements)');
+export async function generateSteamLeaderboard(embed, isSummary = false) {
+    const { rows } = await query(`
+        SELECT u.discord_id, la.username, la.extra_data
+        FROM linked_accounts la
+        JOIN users u ON la.discord_id = u.discord_id
+        WHERE la.platform = 'steam'
+    `);
+
+    // Sort by Steam Level
+    const sorted = rows.sort((a, b) => {
+        const levelA = parseInt(a.extra_data?.steamLevel || 0);
+        const levelB = parseInt(b.extra_data?.steamLevel || 0);
+        return levelB - levelA;
+    });
+
+    const top = isSummary ? sorted.slice(0, 3) : sorted.slice(0, 10);
+
+    if (top.length === 0) {
+        if (!isSummary) embed.setDescription('No Steam accounts linked yet.');
+        return;
     }
+
+    const fieldName = isSummary ? '💻 Steam Top 3' : '💻 Steam Leaderboard';
+    const fieldValue = top.map((user, index) => {
+        const level = user.extra_data?.steamLevel || 0;
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        return `${medal} **${user.username}** — Lvl ${level}`;
+    }).join('\n');
+
+    embed.addFields({ name: fieldName, value: fieldValue, inline: false });
 }

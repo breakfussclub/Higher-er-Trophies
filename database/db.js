@@ -8,6 +8,9 @@ const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
     console.warn('⚠️ DATABASE_URL is not defined. Database features will not work.');
+} else {
+    const masked = connectionString.replace(/:([^:@]+)@/, ':****@');
+    console.log(`DEBUG: DATABASE_URL is set to: ${masked}`);
 }
 
 const pool = new Pool({

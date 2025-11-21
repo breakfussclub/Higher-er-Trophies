@@ -81,3 +81,39 @@ export async function getAchievementSchema(appId) {
         return null;
     }
 }
+
+export async function getSteamLevel(steamId) {
+    try {
+        const url = `${STEAM_API_BASE}/IPlayerService/GetSteamLevel/v1/?key=${config.steam.apiKey}&steamid=${steamId}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        return data.response;
+    } catch (error) {
+        logger.error(`[Steam] Error fetching level for ${steamId}: ${error.message}`);
+        return null;
+    }
+}
+
+export async function getSteamBadges(steamId) {
+    try {
+        const url = `${STEAM_API_BASE}/IPlayerService/GetBadges/v1/?key=${config.steam.apiKey}&steamid=${steamId}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        return data.response;
+    } catch (error) {
+        logger.error(`[Steam] Error fetching badges for ${steamId}: ${error.message}`);
+        return null;
+    }
+}
+
+export async function getRecentlyPlayedGames(steamId) {
+    try {
+        const url = `${STEAM_API_BASE}/IPlayerService/GetRecentlyPlayedGames/v1/?key=${config.steam.apiKey}&steamid=${steamId}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        return data.response;
+    } catch (error) {
+        logger.error(`[Steam] Error fetching recently played games for ${steamId}: ${error.message}`);
+        return null;
+    }
+}

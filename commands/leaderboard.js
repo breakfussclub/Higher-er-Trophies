@@ -10,6 +10,7 @@ export default {
                 .setDescription('Filter by platform')
                 .setRequired(false)
                 .addChoices(
+                    { name: 'Global (Unified Score)', value: 'global' },
                     { name: 'Xbox (Gamerscore)', value: 'xbox' },
                     { name: 'PlayStation (Trophies)', value: 'psn' },
                     { name: 'Steam (Achievements)', value: 'steam' }
@@ -37,6 +38,8 @@ export default {
                 await generatePSNLeaderboard(embed);
             } else if (platformFilter === 'steam') {
                 await generateSteamLeaderboard(embed);
+            } else if (platformFilter === 'global') {
+                await generateGlobalLeaderboard(embed);
             } else {
                 // Show all
                 embed.setTitle('🏆 Global Leaderboards');
@@ -157,6 +160,62 @@ export async function generateSteamLeaderboard(embed, isSummary = false) {
         const level = user.extra_data?.steamLevel || 0;
         const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
         return `${medal} **${user.username}** — Lvl ${level}`;
+    }).join('\n');
+
+    embed.addFields({ name: fieldName, value: fieldValue, inline: false });
+}
+
+export async function generateGlobalLeaderboard(embed, isSummary = false) {
+    const { rows } = await query(`
+        SELECT u.discord_id, 
+               json_object_agg(la.platform, la.extra_data) as accounts,
+               MAX(la.username) as username
+        FROM linked_accounts la
+        JOIN users u ON la.discord_id = u.discord_id
+        GROUP BY u.discord_id
+    `);
+
+    // Calculate Total Score
+    const ranked = rows.map(user => {
+        const accounts = user.accounts || {};
+        let totalScore = 0;
+
+        // Xbox: 1 Gamerscore = 1 Point
+        if (accounts.xbox) {
+            totalScore += parseInt(accounts.xbox.gamerscore || 0);
+        }
+
+        // PSN: Platinum=300, Gold=90, Silver=30, Bronze=15
+        if (accounts.psn && accounts.psn.earnedTrophies) {
+            const t = accounts.psn.earnedTrophies;
+            totalScore += (t.platinum || 0) * 300;
+            totalScore += (t.gold || 0) * 90;
+            totalScore += (t.silver || 0) * 30;
+            totalScore += (t.bronze || 0) * 15;
+        }
+
+        // Steam: Level * 500
+        if (accounts.steam) {
+            totalScore += (parseInt(accounts.steam.steamLevel || 0) * 500);
+        }
+
+        return {
+            username: user.username || 'Unknown',
+            score: totalScore
+        };
+    }).sort((a, b) => b.score - a.score);
+
+    const top = isSummary ? ranked.slice(0, 3) : ranked.slice(0, 10);
+
+    if (top.length === 0) {
+        if (!isSummary) embed.setDescription('No accounts linked yet.');
+        return;
+    }
+
+    const fieldName = isSummary ? '🌍 Global Top 3' : '🌍 Global Leaderboard';
+    const fieldValue = top.map((user, index) => {
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        return `${medal} **${user.username}** — ${user.score.toLocaleString()} pts`;
     }).join('\n');
 
     embed.addFields({ name: fieldName, value: fieldValue, inline: false });

@@ -22,6 +22,31 @@ async function getAllUsers() {
 }
 
 /**
+ * Update account extra_data in DB
+ */
+async function updateAccountData(discordId, platform, newData) {
+    try {
+        // First fetch existing data to merge
+        const { rows } = await query(
+            `SELECT extra_data FROM linked_accounts WHERE discord_id = $1 AND platform = $2`,
+            [discordId, platform]
+        );
+
+        if (rows.length > 0) {
+            const existingData = rows[0].extra_data || {};
+            const mergedData = { ...existingData, ...newData };
+
+            await query(
+                `UPDATE linked_accounts SET extra_data = $1 WHERE discord_id = $2 AND platform = $3`,
+                [mergedData, discordId, platform]
+            );
+        }
+    } catch (error) {
+        logger.error(`[Sync] Failed to update account data for ${discordId} (${platform}): ${error.message}`);
+    }
+}
+
+/**
  * Check if achievement exists in DB
  */
 async function isAchievementLogged(discordId, platform, gameId, achievementId) {
@@ -51,6 +76,7 @@ async function logAchievement(discordId, platform, gameId, achievementId, unlock
 async function checkSteam(discordId, steamAccount) {
     const newAchievements = [];
     const steamId = steamAccount.extraData?.steamId64 || steamAccount.accountId;
+    let totalAchievements = steamAccount.extraData?.totalAchievements || 0;
 
     try {
         const games = await SteamService.getSteamGames(steamId);
@@ -66,6 +92,13 @@ async function checkSteam(discordId, steamAccount) {
             if (!playerStats?.achievements) continue;
 
             const unlocked = playerStats.achievements.filter(a => a.achieved === 1);
+
+            // Very rough estimate update, ideally we'd sum all games but that's expensive
+            // For now, let's just rely on what we find, or maybe we can find a better API later.
+            // Actually, let's just not update totalAchievements for Steam yet if we can't do it accurately.
+            // Wait, we can just count the ones we see? No, that's partial.
+            // Let's leave Steam totalAchievements as 0 for now unless we find a better way.
+
             if (unlocked.length === 0) continue;
 
             // Check which ones are new
@@ -99,6 +132,17 @@ async function checkSteam(discordId, steamAccount) {
                 }
             }
         }
+
+        // Update Steam profile info if possible (avatar, etc) - SteamService doesn't return full profile here
+        // We could call getSteamProfile here to get avatar and name updates
+        const profile = await SteamService.getSteamProfile(steamId);
+        if (profile) {
+            await updateAccountData(discordId, 'steam', {
+                avatarUrl: profile.avatarfull,
+                username: profile.personaname
+            });
+        }
+
     } catch (error) {
         logger.error(`[Sync] Error checking Steam for ${discordId}: ${error.message}`);
     }
@@ -111,13 +155,21 @@ async function checkSteam(discordId, steamAccount) {
  */
 async function checkPSN(discordId, psnAccount) {
     const newTrophies = [];
-    const accountId = psnAccount.extraData?.accountId || psnAccount.accountId; // Should be accountId from DB
+    const accountId = psnAccount.extraData?.accountId || psnAccount.accountId;
 
     try {
-        // If we don't have the numeric accountId, we might need to fetch it, but migration should have handled it.
-        // If accountId is username, we might fail here if not cached.
-        // Assuming migration/link stored the numeric ID in extraData or accountId.
+        // 1. Fetch Profile Summary for Leaderboard
+        const profile = await PSNService.getPSNProfile(accountId);
+        if (profile) {
+            await updateAccountData(discordId, 'psn', {
+                trophyLevel: profile.trophyLevel,
+                earnedTrophies: profile.earnedTrophies, // { platinum, gold, silver, bronze }
+                avatarUrl: profile.avatarUrl,
+                username: profile.onlineId
+            });
+        }
 
+        // 2. Check for new trophies
         const titlesResponse = await PSNService.getPSNUserTitles(accountId);
         if (!titlesResponse?.trophyTitles) return [];
 
@@ -175,13 +227,30 @@ async function checkXbox(discordId, xboxAccount) {
     const newAchievements = [];
     const xuid = xboxAccount.extraData?.xuid;
 
-    if (!xuid) {
-        // If we don't have XUID, we can't check. Migration should have it.
-        // Or we could try to fetch it if we have the gamertag.
-        return [];
-    }
+    if (!xuid) return [];
 
     try {
+        // 1. Fetch Profile for Leaderboard
+        // We can get Gamerscore from getXboxProfile. 
+        // Note: We need the gamertag to call getXboxProfile, or we can try to get it from xuid if we had a method.
+        // But wait, getXboxProfile takes a gamertag. 
+        // Let's see if we have the gamertag in extraData or accountId.
+        // Usually accountId for Xbox in our DB is the Gamertag (from the link command).
+
+        const gamertag = xboxAccount.extraData?.gamertag || xboxAccount.accountId;
+        if (gamertag) {
+            const profile = await XboxService.getXboxProfile(gamertag);
+            if (profile) {
+                await updateAccountData(discordId, 'xbox', {
+                    gamerscore: profile.gamerscore,
+                    gamertag: profile.gamertag, // Update in case of change
+                    accountTier: profile.accountTier,
+                    profilePicture: profile.profilePicture
+                });
+            }
+        }
+
+        // 2. Check for new achievements
         const achievements = await XboxService.getXboxAchievements(xuid);
         if (!achievements?.titles) return [];
 

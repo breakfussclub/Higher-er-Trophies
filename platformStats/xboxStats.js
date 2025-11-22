@@ -71,7 +71,7 @@ export async function getXboxStats(xboxGamertag) {
           console.log(`Achievements response type: ${typeof achievementsForTitle}`); // DEBUG
           console.log('Raw Xbox Title Achievements:', JSON.stringify(achievementsForTitle, null, 2)); // DEBUG
 
-          if (achievementsForTitle && Array.isArray(achievementsForTitle.achievements)) {
+          if (achievementsForTitle && Array.isArray(achievementsForTitle.achievements) && achievementsForTitle.achievements.length > 0) {
             const unlocked = achievementsForTitle.achievements
               .filter(a => a.progressState === 'Achieved')
               .sort((a, b) => new Date(b.progression.timeUnlocked) - new Date(a.progression.timeUnlocked))
@@ -79,9 +79,23 @@ export async function getXboxStats(xboxGamertag) {
 
             if (unlocked.length > 0) {
               recentAchievementsDisplay = unlocked.map(a => {
+                const emoji = '🏆'; // Standard trophy emoji
                 const name = a.name || 'Unknown Achievement';
                 const desc = a.description || 'No description';
-                return `🏆 **${name}** (${lastTitle.name})\n   └─ ${desc}`;
+                return `${emoji} **${name}** (${lastTitle.name})\n   └─ ${desc}`;
+              }).join('\n');
+            }
+          } else {
+            // Fallback: Try getting recent achievements from the general endpoint if title-specific fails
+            console.log('Title achievements empty, trying general recent achievements...');
+            const recentAch = await getRecentAchievements(xboxProfile.xuid);
+            if (recentAch && recentAch.length > 0) {
+              recentAchievementsDisplay = recentAch.slice(0, 3).map(a => {
+                const emoji = '🏆';
+                const name = a.name || 'Unknown Achievement';
+                const desc = a.description || 'No description';
+                const gameName = a.titleAssociations && a.titleAssociations.length > 0 ? a.titleAssociations[0].name : 'Unknown Game';
+                return `${emoji} **${name}** (${gameName})\n   └─ ${desc}`;
               }).join('\n');
             }
           }

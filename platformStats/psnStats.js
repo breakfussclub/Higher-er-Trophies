@@ -42,13 +42,18 @@ export async function getPSNStats(onlineIdOrAccountId) {
     let recentTrophiesDisplay = '';
     try {
       // 1. Get recent titles
+      console.log('Fetching PSN user titles...');
       const titlesResponse = await getPSNUserTitles(profile.accountId);
+      console.log(`Titles found: ${titlesResponse?.titles?.length || 0}`);
+
       if (titlesResponse && titlesResponse.titles && titlesResponse.titles.length > 0) {
         // 2. Get the most recent title
         const lastTitle = titlesResponse.titles[0]; // Assuming API returns sorted by recent
+        console.log(`Most recent title: ${lastTitle.name} (${lastTitle.npCommunicationId})`);
 
         // 3. Get trophies for this title
         const trophiesResponse = await getPSNTitleTrophies(profile.accountId, lastTitle.npCommunicationId, 'default');
+        console.log(`Trophies response: ${trophiesResponse ? 'Received' : 'Null'}`);
 
         if (trophiesResponse && trophiesResponse.trophies) {
           // 4. Filter for earned and sort by date
@@ -56,6 +61,8 @@ export async function getPSNStats(onlineIdOrAccountId) {
             .filter(t => t.earned)
             .sort((a, b) => new Date(b.earnedDateTime) - new Date(a.earnedDateTime))
             .slice(0, 3);
+
+          console.log(`Recent earned trophies: ${earned.length}`);
 
           if (earned.length > 0) {
             recentTrophiesDisplay = earned.map(t => {

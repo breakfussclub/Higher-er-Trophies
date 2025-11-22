@@ -136,6 +136,7 @@ export async function getPSNProfile(onlineIdOrAccountId) {
 
         try {
             const fullProfile = await getFullProfile(accountId);
+            console.log('Full Profile Response:', JSON.stringify(fullProfile, null, 2)); // DEBUG
             if (fullProfile?.profile?.avatars && fullProfile.profile.avatars.length > 0) {
                 avatarUrl = fullProfile.profile.avatars[0].url;
             }
@@ -143,6 +144,7 @@ export async function getPSNProfile(onlineIdOrAccountId) {
                 onlineId = fullProfile.profile.onlineId;
             }
         } catch (err) {
+            console.error('Error fetching full PSN profile:', err.message); // DEBUG
             // Ignore profile fetch errors (privacy settings)
         }
 

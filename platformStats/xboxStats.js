@@ -63,11 +63,13 @@ export async function getXboxStats(xboxGamertag) {
         const lastTitle = recentTitles[0];
 
         if (lastTitle) {
-          // Fetch achievements for this title
-          const titleAch = await getTitleAchievements(lastTitle.titleId, xboxProfile.xuid);
+          // Now fetch achievements for this specific title
+          // FIXED: Parameter order was wrong (titleId, xuid)
+          console.log(`Fetching achievements for title: ${lastTitle.name} (${lastTitle.titleId})`);
+          const achievementsForTitle = await getTitleAchievements(lastTitle.titleId, xboxProfile.xuid);
 
-          if (titleAch && titleAch.achievements) {
-            const unlocked = titleAch.achievements
+          if (achievementsForTitle && Array.isArray(achievementsForTitle)) {
+            const unlocked = achievementsForTitle
               .filter(a => a.progressState === 'Achieved')
               .sort((a, b) => new Date(b.progression.timeUnlocked) - new Date(a.progression.timeUnlocked))
               .slice(0, 3);

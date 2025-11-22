@@ -55,7 +55,7 @@ export default {
       })
       .setTimestamp();
 
-    let hasAnyStats = false;
+    let allFields = [];
     let errorMessages = [];
 
     // Fetch Steam stats
@@ -67,8 +67,7 @@ export default {
           if (steamStats.author) embed.setAuthor(steamStats.author);
           if (steamStats.thumbnail) embed.setThumbnail(steamStats.thumbnail);
           if (steamStats.footer) embed.setFooter(steamStats.footer);
-          embed.addFields(steamStats.fields);
-          hasAnyStats = true;
+          allFields.push(...steamStats.fields);
         }
       } catch (error) {
         console.error('Error fetching Steam stats:', error);
@@ -82,12 +81,11 @@ export default {
         const psnStats = await getPSNStats(userData.psn);
         if (psnStats.fields && psnStats.fields.length > 0) {
           // Only override color/author if Steam didn't set them
-          if (psnStats.color && !hasAnyStats) embed.setColor(psnStats.color);
-          if (psnStats.author && !hasAnyStats) embed.setAuthor(psnStats.author);
-          if (psnStats.thumbnail && !hasAnyStats) embed.setThumbnail(psnStats.thumbnail);
-          if (psnStats.footer && !hasAnyStats) embed.setFooter(psnStats.footer);
-          embed.addFields(psnStats.fields);
-          hasAnyStats = true;
+          if (psnStats.color && allFields.length === 0) embed.setColor(psnStats.color);
+          if (psnStats.author && allFields.length === 0) embed.setAuthor(psnStats.author);
+          if (psnStats.thumbnail && allFields.length === 0) embed.setThumbnail(psnStats.thumbnail);
+          if (psnStats.footer && allFields.length === 0) embed.setFooter(psnStats.footer);
+          allFields.push(...psnStats.fields);
         }
       } catch (error) {
         console.error('Error fetching PSN stats:', error);
@@ -101,12 +99,11 @@ export default {
         const xboxStats = await getXboxStats(userData.xbox);
         if (xboxStats.fields && xboxStats.fields.length > 0) {
           // Apply Xbox embed styling if it's the only platform or first platform
-          if (xboxStats.color && !hasAnyStats) embed.setColor(xboxStats.color);
-          if (xboxStats.author && !hasAnyStats) embed.setAuthor(xboxStats.author);
-          if (xboxStats.thumbnail && !hasAnyStats) embed.setThumbnail(xboxStats.thumbnail);
-          if (xboxStats.footer && !hasAnyStats) embed.setFooter(xboxStats.footer);
-          embed.addFields(xboxStats.fields);
-          hasAnyStats = true;
+          if (xboxStats.color && allFields.length === 0) embed.setColor(xboxStats.color);
+          if (xboxStats.author && allFields.length === 0) embed.setAuthor(xboxStats.author);
+          if (xboxStats.thumbnail && allFields.length === 0) embed.setThumbnail(xboxStats.thumbnail);
+          if (xboxStats.footer && allFields.length === 0) embed.setFooter(xboxStats.footer);
+          allFields.push(...xboxStats.fields);
         }
       } catch (error) {
         console.error('Error fetching Xbox stats:', error);
@@ -115,15 +112,15 @@ export default {
     }
 
     // If no stats were fetched at all
-    if (!hasAnyStats) {
+    if (allFields.length === 0 && errorMessages.length === 0) {
       return await interaction.editReply({
-        content: `❌ No stats available for the selected platform(s).\n${errorMessages.join('\n')}`
+        content: `❌ No stats available for the selected platform(s).`
       });
     }
 
     // Add error messages as a field if some platforms failed
     if (errorMessages.length > 0) {
-      embed.addFields({
+      allFields.push({
         name: '⚠️ Errors',
         value: errorMessages.join('\n'),
         inline: false
@@ -131,11 +128,10 @@ export default {
     }
 
     // Check field limit (Discord max is 25)
-    if (embed.data.fields && embed.data.fields.length > 25) {
-      const excess = embed.data.fields.length - 25;
-      // Remove excess fields from the end, but keep the error field if possible
-      // Strategy: Keep the first 24 fields and add a "truncated" notice
-      const keptFields = embed.data.fields.slice(0, 24);
+    if (allFields.length > 25) {
+      const excess = allFields.length - 25;
+      // Keep the first 24 fields and add a "truncated" notice
+      const keptFields = allFields.slice(0, 24);
 
       keptFields.push({
         name: '⚠️ Truncated',
@@ -143,8 +139,10 @@ export default {
         inline: false
       });
 
-      embed.setFields(keptFields);
+      allFields = keptFields;
     }
+
+    embed.addFields(allFields);
 
     await interaction.editReply({ embeds: [embed] });
   }

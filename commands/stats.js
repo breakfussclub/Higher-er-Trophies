@@ -102,7 +102,13 @@ export default {
           const isPriority = platform === 'xbox';
           if (xboxStats.color && (allFields.length === 0 || isPriority)) embed.setColor(xboxStats.color);
           if (xboxStats.author && (allFields.length === 0 || isPriority)) embed.setAuthor(xboxStats.author);
-          if (xboxStats.thumbnail && (!embed.data.thumbnail || isPriority)) embed.setThumbnail(xboxStats.thumbnail);
+          if (xboxStats.author && (allFields.length === 0 || isPriority)) embed.setAuthor(xboxStats.author);
+          if (xboxStats.thumbnail && (!embed.data.thumbnail || isPriority)) {
+            console.log(`[Stats] Setting Xbox thumbnail: ${xboxStats.thumbnail}`);
+            embed.setThumbnail(xboxStats.thumbnail);
+          } else {
+            console.log(`[Stats] Skipped Xbox thumbnail. HasThumbnail: ${!!xboxStats.thumbnail}, HasEmbedThumb: ${!!embed.data.thumbnail}, IsPriority: ${isPriority}`);
+          }
           if (xboxStats.footer && (allFields.length === 0 || isPriority)) embed.setFooter(xboxStats.footer);
           allFields.push(...xboxStats.fields);
         }

@@ -108,9 +108,13 @@ export async function getRecentAchievements(xuid) {
             return [];
         }
 
-        // 2. Sort by last unlock and take top 5 (increased from 3 to find more candidates)
+        // 2. Sort by last unlock OR last played (matching sync logic) and take top 5
         const recentTitles = titlesData.titles
-            .sort((a, b) => new Date(b.lastUnlock || 0) - new Date(a.lastUnlock || 0))
+            .sort((a, b) => {
+                const timeA = new Date(a.lastUnlock || a.lastPlayed || 0).getTime();
+                const timeB = new Date(b.lastUnlock || b.lastPlayed || 0).getTime();
+                return timeB - timeA;
+            })
             .slice(0, 5);
 
         logger.info(`[Xbox] Checking recent achievements for top ${recentTitles.length} titles`);
@@ -119,8 +123,15 @@ export async function getRecentAchievements(xuid) {
 
         // 3. Fetch achievements for these titles
         for (const title of recentTitles) {
+            logger.info(`[Xbox] Fetching achievements for title: ${title.name} (ID: ${title.titleId})`);
             const achData = await getTitleAchievements(title.titleId, xuid);
+
+            if (achData) {
+                logger.info(`[Xbox] Raw response for ${title.name}: ${JSON.stringify(achData).substring(0, 200)}...`); // Log first 200 chars
+            }
+
             if (achData && achData.achievements) {
+                logger.info(`[Xbox] Found ${achData.achievements.length} achievements for ${title.name}`);
                 // Add title name to each achievement for display
                 const achievementsWithTitle = achData.achievements.map(a => ({
                     ...a,

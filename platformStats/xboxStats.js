@@ -244,7 +244,7 @@ export async function getXboxStats(xboxGamertag) {
 
     return {
       color: embedColor,
-      thumbnail: xboxProfile.profilePicture?.replace('http://', 'https://') + '&w=256&h=256', // Forced HTTPS + Resize
+      thumbnail: xboxProfile.profilePicture?.replace('http://', 'https://') + '&w=64&h=64', // Testing 64x64 to match working icon
       author: {
         name: `${xboxProfile.gamertag || xboxGamertag} - Xbox Live`,
         iconURL: xboxProfile.profilePicture?.replace('http://', 'https://') + '&w=64&h=64', // Forced HTTPS + Resize for icon

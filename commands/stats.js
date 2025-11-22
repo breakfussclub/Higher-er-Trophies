@@ -84,7 +84,12 @@ export default {
           const isPriority = platform === 'psn';
           if (psnStats.color && (allFields.length === 0 || isPriority)) embed.setColor(psnStats.color);
           if (psnStats.author && (allFields.length === 0 || isPriority)) embed.setAuthor(psnStats.author);
-          if (psnStats.thumbnail && (!embed.data.thumbnail || isPriority)) embed.setThumbnail(psnStats.thumbnail);
+          if (psnStats.thumbnail && (!embed.data.thumbnail || isPriority)) {
+            console.log(`[Stats] Setting PSN thumbnail: ${psnStats.thumbnail}`);
+            embed.setThumbnail(psnStats.thumbnail);
+          } else {
+            console.log(`[Stats] Skipped PSN thumbnail. HasThumbnail: ${!!psnStats.thumbnail}, HasEmbedThumb: ${!!embed.data.thumbnail}, IsPriority: ${isPriority}`);
+          }
           if (psnStats.footer && (allFields.length === 0 || isPriority)) embed.setFooter(psnStats.footer);
           allFields.push(...psnStats.fields);
         }
@@ -103,7 +108,12 @@ export default {
           if (xboxStats.color && (allFields.length === 0 || isPriority)) embed.setColor(xboxStats.color);
           if (xboxStats.author && (allFields.length === 0 || isPriority)) embed.setAuthor(xboxStats.author);
           if (xboxStats.author && (allFields.length === 0 || isPriority)) embed.setAuthor(xboxStats.author);
-          if (xboxStats.thumbnail && (!embed.data.thumbnail || isPriority)) embed.setThumbnail(xboxStats.thumbnail);
+          if (xboxStats.thumbnail && (!embed.data.thumbnail || isPriority)) {
+            console.log(`[Stats] Setting Xbox thumbnail: ${xboxStats.thumbnail}`);
+            embed.setThumbnail(xboxStats.thumbnail);
+          } else {
+            console.log(`[Stats] Skipped Xbox thumbnail. HasThumbnail: ${!!xboxStats.thumbnail}, HasEmbedThumb: ${!!embed.data.thumbnail}, IsPriority: ${isPriority}`);
+          }
           if (xboxStats.footer && (allFields.length === 0 || isPriority)) embed.setFooter(xboxStats.footer);
           allFields.push(...xboxStats.fields);
         }

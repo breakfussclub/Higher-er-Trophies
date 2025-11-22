@@ -73,29 +73,21 @@ export async function generateXboxLeaderboard(embed, isSummary = false) {
         return scoreB - scoreA;
     });
 
-    const top = isSummary ? sorted.slice(0, 5) : sorted.slice(0, 15);
+    const top = isSummary ? sorted.slice(0, 3) : sorted.slice(0, 10);
 
     if (top.length === 0) {
         if (!isSummary) embed.setDescription('No Xbox accounts linked yet.');
         return;
     }
 
-    let table = '```\n';
-    table += 'Rank | User           | Gamerscore \n';
-    table += '-----|----------------|------------\n';
+    const fieldName = isSummary ? '🟢 Xbox Top 3' : '🟢 Xbox Leaderboard';
+    const fieldValue = top.map((user, index) => {
+        const score = user.extra_data?.gamerscore || 0;
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        return `${medal} **${user.username}** — ${score.toLocaleString()} Ⓖ`;
+    }).join('\n');
 
-    top.forEach((user, index) => {
-        const rank = (index + 1).toString().padEnd(4);
-        const name = user.username.substring(0, 14).padEnd(14);
-        const score = (user.extra_data?.gamerscore || 0).toLocaleString().padEnd(10);
-
-        table += `${rank} | ${name} | ${score}\n`;
-    });
-
-    table += '```';
-
-    const fieldName = isSummary ? '🟢 Xbox Leaderboard' : '🟢 Xbox Leaderboard (Top 15)';
-    embed.addFields({ name: fieldName, value: table, inline: false });
+    embed.addFields({ name: fieldName, value: fieldValue, inline: false });
 }
 
 export async function generatePSNLeaderboard(embed, isSummary = false) {
@@ -122,35 +114,23 @@ export async function generatePSNLeaderboard(embed, isSummary = false) {
         return totalB - totalA;
     });
 
-    const top = isSummary ? sorted.slice(0, 5) : sorted.slice(0, 15);
+    const top = isSummary ? sorted.slice(0, 3) : sorted.slice(0, 10);
 
     if (top.length === 0) {
         if (!isSummary) embed.setDescription('No PSN accounts linked yet.');
         return;
     }
 
-    let table = '```\n';
-    table += 'Rank | User           | Lvl  | Plats | Total \n';
-    table += '-----|----------------|------|-------|-------\n';
-
-    top.forEach((user, index) => {
-        const rank = (index + 1).toString().padEnd(4);
-        const name = user.username.substring(0, 14).padEnd(14);
-
-        const level = (user.extra_data?.trophyLevel || 0).toString().padEnd(4);
+    const fieldName = isSummary ? '🔵 PSN Top 3' : '🔵 PSN Leaderboard';
+    const fieldValue = top.map((user, index) => {
+        const level = user.extra_data?.trophyLevel || 0;
         const trophies = user.extra_data?.earnedTrophies;
-        const plats = (trophies?.platinum || 0).toString().padEnd(5);
+        const plats = trophies?.platinum || 0;
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        return `${medal} **${user.username}** — Lvl ${level} (${plats} 🏆)`;
+    }).join('\n');
 
-        const totalCount = ((trophies?.platinum || 0) + (trophies?.gold || 0) + (trophies?.silver || 0) + (trophies?.bronze || 0));
-        const total = totalCount.toLocaleString().padEnd(5);
-
-        table += `${rank} | ${name} | ${level} | ${plats} | ${total}\n`;
-    });
-
-    table += '```';
-
-    const fieldName = isSummary ? '🔵 PSN Leaderboard' : '🔵 PSN Leaderboard (Top 15)';
-    embed.addFields({ name: fieldName, value: table, inline: false });
+    embed.addFields({ name: fieldName, value: fieldValue, inline: false });
 }
 
 export async function generateSteamLeaderboard(embed, isSummary = false) {
@@ -168,29 +148,21 @@ export async function generateSteamLeaderboard(embed, isSummary = false) {
         return levelB - levelA;
     });
 
-    const top = isSummary ? sorted.slice(0, 5) : sorted.slice(0, 15);
+    const top = isSummary ? sorted.slice(0, 3) : sorted.slice(0, 10);
 
     if (top.length === 0) {
         if (!isSummary) embed.setDescription('No Steam accounts linked yet.');
         return;
     }
 
-    let table = '```\n';
-    table += 'Rank | User           | Level \n';
-    table += '-----|----------------|-------\n';
+    const fieldName = isSummary ? '☁️ Steam Top 3' : '☁️ Steam Leaderboard';
+    const fieldValue = top.map((user, index) => {
+        const level = user.extra_data?.steamLevel || 0;
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        return `${medal} **${user.username}** — Lvl ${level}`;
+    }).join('\n');
 
-    top.forEach((user, index) => {
-        const rank = (index + 1).toString().padEnd(4);
-        const name = user.username.substring(0, 14).padEnd(14);
-        const level = (user.extra_data?.steamLevel || 0).toString().padEnd(5);
-
-        table += `${rank} | ${name} | ${level}\n`;
-    });
-
-    table += '```';
-
-    const fieldName = isSummary ? '☁️ Steam Leaderboard' : '☁️ Steam Leaderboard (Top 15)';
-    embed.addFields({ name: fieldName, value: table, inline: false });
+    embed.addFields({ name: fieldName, value: fieldValue, inline: false });
 }
 
 export async function generateGlobalLeaderboard(embed, isSummary = false) {
@@ -238,39 +210,27 @@ export async function generateGlobalLeaderboard(embed, isSummary = false) {
         };
     }).sort((a, b) => b.score - a.score);
 
-    const top = isSummary ? ranked.slice(0, 5) : ranked.slice(0, 15); // Show top 5 in summary, 15 in full
+    const top = isSummary ? ranked.slice(0, 3) : ranked.slice(0, 10); // Show top 3 in summary, 10 in full
 
     if (top.length === 0) {
         if (!isSummary) embed.setDescription('No accounts linked yet.');
         return;
     }
 
-    // Build Table
-    // Columns: Rank | User | XB | PS | St | Total
-    // We need to pad strings to align them.
-
-    let table = '```\n';
-    table += 'Rank | User           | XB      | PS   | St   | Total  \n';
-    table += '-----|----------------|---------|------|------|--------\n';
-
-    top.forEach((user, index) => {
-        const rank = (index + 1).toString().padEnd(4);
-        const name = user.username.substring(0, 14).padEnd(14); // Truncate to 14 chars
-
-        // Format numbers (e.g. 12.5k) to save space if needed, but for now let's try full numbers
-        const xb = user.breakdown.xbox.toString().padEnd(7);
-        const ps = user.breakdown.psn.toString().padEnd(4); // Level
-        const st = user.breakdown.steam.toString().padEnd(4); // Level
-        const total = user.score.toLocaleString().padEnd(6);
-
-        table += `${rank} | ${name} | ${xb} | ${ps} | ${st} | ${total}\n`;
-    });
-
-    table += '```';
-
-    // Legend
-    const legend = '`XB`: Gamerscore • `PS`: Trophy Level • `St`: Steam Level';
-
     const fieldName = isSummary ? '🌍 Global Leaderboard' : '🌍 Global Leaderboard (Top 15)';
-    embed.addFields({ name: fieldName, value: table + '\n' + legend, inline: false });
+
+    const fieldValue = top.map((user, index) => {
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        const xb = user.breakdown.xbox.toLocaleString();
+        const ps = user.breakdown.psn;
+        const st = user.breakdown.steam;
+
+        let line = `${medal} **${user.username}** — **${user.score.toLocaleString()}**`;
+        // Add breakdown on next line with indentation
+        line += `\n   └─ XB: ${xb} • PS: ${ps} • St: ${st}`;
+
+        return line;
+    }).join('\n\n'); // Double newline for spacing
+
+    embed.addFields({ name: fieldName, value: fieldValue, inline: false });
 }

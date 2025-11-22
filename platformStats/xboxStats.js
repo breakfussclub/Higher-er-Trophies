@@ -68,8 +68,11 @@ export async function getXboxStats(xboxGamertag) {
           console.log(`Fetching achievements for title: ${lastTitle.name} (${lastTitle.titleId})`);
           const achievementsForTitle = await getTitleAchievements(lastTitle.titleId, xboxProfile.xuid);
 
-          if (achievementsForTitle && Array.isArray(achievementsForTitle)) {
-            const unlocked = achievementsForTitle
+          console.log(`Achievements response type: ${typeof achievementsForTitle}`); // DEBUG
+          console.log(`Achievements array length: ${achievementsForTitle?.achievements?.length}`); // DEBUG
+
+          if (achievementsForTitle && Array.isArray(achievementsForTitle.achievements)) {
+            const unlocked = achievementsForTitle.achievements
               .filter(a => a.progressState === 'Achieved')
               .sort((a, b) => new Date(b.progression.timeUnlocked) - new Date(a.progression.timeUnlocked))
               .slice(0, 3);

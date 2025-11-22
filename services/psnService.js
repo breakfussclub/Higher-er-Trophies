@@ -137,11 +137,14 @@ export async function getPSNProfile(onlineIdOrAccountId) {
         try {
             const fullProfile = await getFullProfile(accountId);
             console.log('Full Profile Response:', JSON.stringify(fullProfile, null, 2)); // DEBUG
-            if (fullProfile?.profile?.avatars && fullProfile.profile.avatars.length > 0) {
-                avatarUrl = fullProfile.profile.avatars[0].url;
+            // FIXED: The API returns the profile object directly, not wrapped in a 'profile' property
+            const profileData = fullProfile.profile || fullProfile;
+
+            if (profileData.avatars && profileData.avatars.length > 0) {
+                avatarUrl = profileData.avatars[0].url;
             }
-            if (fullProfile?.profile?.onlineId) {
-                onlineId = fullProfile.profile.onlineId;
+            if (profileData.onlineId) {
+                onlineId = profileData.onlineId;
             }
         } catch (err) {
             console.error('Error fetching full PSN profile:', err.message); // DEBUG
@@ -168,6 +171,7 @@ export async function getPSNUserTitles(accountId) {
     try {
         const authorization = await getAuthorization();
         const response = await getUserTitles(authorization, accountId);
+        console.log('Raw PSN Titles Response:', JSON.stringify(response, null, 2)); // DEBUG
         return response;
     } catch (error) {
         logger.error(`[PSN] Error fetching titles for ${accountId}: ${error.message}`);

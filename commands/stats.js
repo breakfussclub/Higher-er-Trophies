@@ -151,6 +151,8 @@ export default {
 
     embed.addFields(allFields);
 
+    console.log('[Stats] Final Embed Payload:', JSON.stringify(embed.toJSON(), null, 2));
+
     await interaction.editReply({ embeds: [embed] });
   }
 };

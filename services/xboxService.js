@@ -58,6 +58,7 @@ export async function getXboxProfile(gamertag) {
 
         const accountData = await getXboxAccount(xuid);
         const settings = parseSettings(accountData.profileUsers?.[0]?.settings);
+        logger.info(`[Xbox] Profile settings for ${gamertag}: ${JSON.stringify(settings, null, 2)}`);
 
         return {
             xuid: xuid,

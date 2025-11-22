@@ -130,6 +130,22 @@ export default {
       });
     }
 
+    // Check field limit (Discord max is 25)
+    if (embed.data.fields && embed.data.fields.length > 25) {
+      const excess = embed.data.fields.length - 25;
+      // Remove excess fields from the end, but keep the error field if possible
+      // Strategy: Keep the first 24 fields and add a "truncated" notice
+      const keptFields = embed.data.fields.slice(0, 24);
+
+      keptFields.push({
+        name: '⚠️ Truncated',
+        value: `...and ${excess + 1} more fields hidden due to Discord limits.`,
+        inline: false
+      });
+
+      embed.setFields(keptFields);
+    }
+
     await interaction.editReply({ embeds: [embed] });
   }
 };

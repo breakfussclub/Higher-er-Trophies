@@ -244,10 +244,10 @@ export async function getXboxStats(xboxGamertag) {
 
     return {
       color: embedColor,
-      thumbnail: xboxProfile.profilePicture,
+      thumbnail: xboxProfile.profilePicture?.replace('http://', 'https://'),
       author: {
         name: `${xboxProfile.gamertag || xboxGamertag} - Xbox Live`,
-        iconURL: xboxProfile.profilePicture,
+        iconURL: xboxProfile.profilePicture?.replace('http://', 'https://'),
         url: `https://www.xbox.com/en-US/play/user/${xboxProfile.gamertag || xboxGamertag}`
       },
       footer: {

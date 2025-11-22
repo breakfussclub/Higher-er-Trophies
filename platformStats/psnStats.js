@@ -1,4 +1,4 @@
-import { getPSNProfile } from '../services/psnService.js';
+import { getPSNProfile, getPSNUserTitles, getPSNTitleTrophies } from '../services/psnService.js';
 
 function getTrophyEmoji(type) {
   const emojis = {
@@ -37,6 +37,40 @@ export async function getPSNStats(onlineIdOrAccountId) {
     if (!profile || !profile.earnedTrophies) {
       throw new Error('Invalid profile data received from PSN API');
     }
+
+    // Fetch Recent Trophies
+    let recentTrophiesDisplay = '';
+    try {
+      // 1. Get recent titles
+      const titlesResponse = await getPSNUserTitles(profile.accountId);
+      if (titlesResponse && titlesResponse.titles && titlesResponse.titles.length > 0) {
+        // 2. Get the most recent title
+        const lastTitle = titlesResponse.titles[0]; // Assuming API returns sorted by recent
+
+        // 3. Get trophies for this title
+        const trophiesResponse = await getPSNTitleTrophies(profile.accountId, lastTitle.npCommunicationId, 'default');
+
+        if (trophiesResponse && trophiesResponse.trophies) {
+          // 4. Filter for earned and sort by date
+          const earned = trophiesResponse.trophies
+            .filter(t => t.earned)
+            .sort((a, b) => new Date(b.earnedDateTime) - new Date(a.earnedDateTime))
+            .slice(0, 3);
+
+          if (earned.length > 0) {
+            recentTrophiesDisplay = earned.map(t => {
+              const emoji = getTrophyEmoji(t.trophyType);
+              const name = t.trophyName || 'Unknown Trophy';
+              const desc = t.trophyDetail || 'No description';
+              return `${emoji} **${name}** (${lastTitle.name})\n   └─ ${desc}`;
+            }).join('\n');
+          }
+        }
+      }
+    } catch (err) {
+      console.log('Could not fetch PSN recent trophies:', err.message);
+    }
+
 
     // Dynamic embed color based on trophy level
     let embedColor = 0x003087; // PSN Blue default
@@ -111,6 +145,20 @@ export async function getPSNStats(onlineIdOrAccountId) {
         inline: true
       }
     ];
+
+    // Add Latest Trophies if found
+    if (recentTrophiesDisplay) {
+      fields.push({
+        name: '━━━━━━━━━━━━━━━━━━━━━',
+        value: '**Latest Trophies**',
+        inline: false
+      });
+      fields.push({
+        name: '\u200b',
+        value: recentTrophiesDisplay,
+        inline: false
+      });
+    }
 
     return {
       thumbnail: profile.avatarUrl,

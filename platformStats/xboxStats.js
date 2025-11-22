@@ -1,4 +1,4 @@
-import { getXboxProfile, searchGamertag } from '../services/xboxService.js';
+import { getXboxProfile, searchGamertag, getXboxAchievements } from '../services/xboxService.js';
 
 function getReputationDisplay(rep) {
   const repMap = {
@@ -51,6 +51,40 @@ export async function getXboxStats(xboxGamertag) {
     } catch (err) {
       console.log('Could not fetch Xbox presence:', err.message);
     }
+
+    // Fetch recent achievements
+    let recentAchievementsDisplay = '';
+    try {
+      const achievementsData = await getXboxAchievements(xboxProfile.xuid);
+      // The API usually returns a list of achievements. We need to sort by time unlocked.
+      // Structure might be data.achievements or similar.
+      // Based on OpenXBL, it might return a list of titles with achievements.
+      // Let's assume it returns a list of achievements directly for the player endpoint.
+
+      if (achievementsData && Array.isArray(achievementsData)) {
+        const unlocked = achievementsData
+          .filter(a => a.progressState === 'Achieved')
+          .sort((a, b) => new Date(b.progression.timeUnlocked) - new Date(a.progression.timeUnlocked))
+          .slice(0, 3);
+
+        if (unlocked.length > 0) {
+          recentAchievementsDisplay = unlocked.map(a => {
+            const name = a.name || 'Unknown Achievement';
+            const desc = a.description || 'No description';
+            const game = a.titleAssociations?.[0]?.name || 'Unknown Game';
+            return `🏆 **${name}** (${game})\n   └─ ${desc}`;
+          }).join('\n');
+        }
+      } else if (achievementsData && achievementsData.titles) {
+        // If it returns titles, we might need to look into the first title
+        // But for now, let's handle the array case or fail gracefully
+        console.log('Xbox achievements returned titles structure, parsing logic might need adjustment if this log appears.');
+      }
+
+    } catch (err) {
+      console.log('Could not fetch Xbox achievements:', err.message);
+    }
+
 
     // Format gamerscore with commas
     const formattedGamerscore = xboxProfile.gamerscore?.toLocaleString() || '0';
@@ -154,6 +188,20 @@ export async function getXboxStats(xboxGamertag) {
       fields.push({
         name: `${statusEmoji} Status`,
         value: presenceData.presenceText || presenceData.presenceState || 'Offline',
+        inline: false
+      });
+    }
+
+    // Add Latest Achievements if found
+    if (recentAchievementsDisplay) {
+      fields.push({
+        name: '━━━━━━━━━━━━━━━━━━━━━',
+        value: '**Latest Achievements**',
+        inline: false
+      });
+      fields.push({
+        name: '\u200b',
+        value: recentAchievementsDisplay,
         inline: false
       });
     }

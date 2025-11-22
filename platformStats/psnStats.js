@@ -44,12 +44,12 @@ export async function getPSNStats(onlineIdOrAccountId) {
       // 1. Get recent titles
       console.log('Fetching PSN user titles...');
       const titlesResponse = await getPSNUserTitles(profile.accountId);
-      console.log(`Titles found: ${titlesResponse?.titles?.length || 0}`);
+      console.log(`Titles found: ${titlesResponse?.trophyTitles?.length || 0}`);
 
-      if (titlesResponse && titlesResponse.titles && titlesResponse.titles.length > 0) {
+      if (titlesResponse && titlesResponse.trophyTitles && titlesResponse.trophyTitles.length > 0) {
         // 2. Get the most recent title
-        const lastTitle = titlesResponse.titles[0]; // Assuming API returns sorted by recent
-        console.log(`Most recent title: ${lastTitle.name} (${lastTitle.npCommunicationId})`);
+        const lastTitle = titlesResponse.trophyTitles[0]; // Assuming API returns sorted by recent
+        console.log(`Most recent title: ${lastTitle.trophyTitleName} (${lastTitle.npCommunicationId})`);
 
         // 3. Get trophies for this title
         const trophiesResponse = await getPSNTitleTrophies(profile.accountId, lastTitle.npCommunicationId, 'default');
@@ -69,7 +69,7 @@ export async function getPSNStats(onlineIdOrAccountId) {
               const emoji = getTrophyEmoji(t.trophyType);
               const name = t.trophyName || 'Unknown Trophy';
               const desc = t.trophyDetail || 'No description';
-              return `${emoji} **${name}** (${lastTitle.name})\n   └─ ${desc}`;
+              return `${emoji} **${name}** (${lastTitle.trophyTitleName})\n   └─ ${desc}`;
             }).join('\n');
           }
         }

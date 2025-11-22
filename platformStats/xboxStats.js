@@ -69,7 +69,7 @@ export async function getXboxStats(xboxGamertag) {
           const achievementsForTitle = await getTitleAchievements(lastTitle.titleId, xboxProfile.xuid);
 
           console.log(`Achievements response type: ${typeof achievementsForTitle}`); // DEBUG
-          console.log(`Achievements array length: ${achievementsForTitle?.achievements?.length}`); // DEBUG
+          console.log('Raw Xbox Title Achievements:', JSON.stringify(achievementsForTitle, null, 2)); // DEBUG
 
           if (achievementsForTitle && Array.isArray(achievementsForTitle.achievements)) {
             const unlocked = achievementsForTitle.achievements

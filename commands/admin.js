@@ -29,11 +29,52 @@ export default {
                 .addStringOption(option =>
                     option.setName('username')
                         .setDescription('The username/ID on the platform')
+                        .setRequired(true)))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('unlink')
+                .setDescription('Unlink a specific platform for a user')
+                .addUserOption(option =>
+                    option.setName('user')
+                        .setDescription('The Discord user to unlink')
+                        .setRequired(true))
+                .addStringOption(option =>
+                    option.setName('platform')
+                        .setDescription('Gaming platform')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: 'Steam', value: 'steam' },
+                            { name: 'PlayStation Network', value: 'psn' },
+                            { name: 'Xbox Live', value: 'xbox' }
+                        )))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('unlink-all')
+                .setDescription('Unlink ALL platforms for a user')
+                .addUserOption(option =>
+                    option.setName('user')
+                        .setDescription('The Discord user to unlink all accounts for')
+                        .setRequired(true)))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('clear-db')
+                .setDescription('⚠️ DANGER: Wipe the entire database (Users, Links, Achievements)')
+                .addBooleanOption(option =>
+                    option.setName('confirm')
+                        .setDescription('You must set this to True to execute')
                         .setRequired(true))),
 
     async execute(interaction) {
-        if (interaction.options.getSubcommand() === 'link') {
+        const subcommand = interaction.options.getSubcommand();
+
+        if (subcommand === 'link') {
             await handleAdminLink(interaction);
+        } else if (subcommand === 'unlink') {
+            await handleAdminUnlink(interaction);
+        } else if (subcommand === 'unlink-all') {
+            await handleAdminUnlinkAll(interaction);
+        } else if (subcommand === 'clear-db') {
+            await handleClearDB(interaction);
         }
     }
 };
@@ -99,14 +140,7 @@ async function handleAdminLink(interaction) {
         else if (platform === 'xbox') {
             try {
                 const searchResult = await searchGamertag(username);
-                accountId = username; // We store Gamertag as the main ID for Xbox usually, or XUID? 
-                // In link.js we stored username as accountId? Let's check. 
-                // link.js: accountId = username; extraData.xuid = searchResult.xuid;
-                // Yes, that matches.
-
-                displayName = username; // Xbox search doesn't always return capitalization, but we can assume input is close enough or use search result if available
-                // searchGamertag returns { xuid, gamertag, ... } usually? 
-                // services/xboxService.js searchGamertag returns data.people[0] which has xuid and gamertag
+                accountId = username;
                 if (searchResult.gamertag) displayName = searchResult.gamertag;
 
                 extraData.xuid = searchResult.xuid;
@@ -118,13 +152,11 @@ async function handleAdminLink(interaction) {
         }
 
         // Insert into Database
-        // 1. Ensure user exists
         await query(
             `INSERT INTO users (discord_id) VALUES ($1) ON CONFLICT (discord_id) DO NOTHING`,
             [userId]
         );
 
-        // 2. Insert/Update Linked Account
         await query(
             `INSERT INTO linked_accounts (discord_id, platform, account_id, username, extra_data)
        VALUES ($1, $2, $3, $4, $5)
@@ -149,5 +181,103 @@ async function handleAdminLink(interaction) {
     } catch (error) {
         console.error('Admin Link Error:', error);
         await interaction.editReply({ content: '❌ An error occurred while linking the account.' });
+    }
+}
+
+async function handleAdminUnlink(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+    const targetUser = interaction.options.getUser('user');
+    const platform = interaction.options.getString('platform');
+
+    try {
+        const result = await query(
+            'DELETE FROM linked_accounts WHERE discord_id = $1 AND platform = $2 RETURNING *',
+            [targetUser.id, platform]
+        );
+
+        if (result.rowCount === 0) {
+            return await interaction.editReply(`❌ ${targetUser} does not have a **${platform.toUpperCase()}** account linked.`);
+        }
+
+        // Also delete achievements for this user/platform
+        await query(
+            'DELETE FROM achievements WHERE discord_id = $1 AND platform = $2',
+            [targetUser.id, platform]
+        );
+
+        const embed = new EmbedBuilder()
+            .setColor(0xFF6B6B)
+            .setTitle('🔗 Account Unlinked')
+            .setDescription(`Successfully unlinked **${platform.toUpperCase()}** for ${targetUser}.`)
+            .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+
+    } catch (error) {
+        console.error('Admin Unlink Error:', error);
+        await interaction.editReply('❌ An error occurred while unlinking the account.');
+    }
+}
+
+async function handleAdminUnlinkAll(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+    const targetUser = interaction.options.getUser('user');
+
+    try {
+        const result = await query(
+            'DELETE FROM linked_accounts WHERE discord_id = $1 RETURNING *',
+            [targetUser.id]
+        );
+
+        if (result.rowCount === 0) {
+            return await interaction.editReply(`❌ ${targetUser} has no linked accounts.`);
+        }
+
+        // Also delete achievements
+        await query(
+            'DELETE FROM achievements WHERE discord_id = $1',
+            [targetUser.id]
+        );
+
+        const embed = new EmbedBuilder()
+            .setColor(0xFF6B6B)
+            .setTitle('🔗 All Accounts Unlinked')
+            .setDescription(`Successfully unlinked **ALL** accounts for ${targetUser}.`)
+            .addFields({ name: 'Accounts Removed', value: result.rowCount.toString(), inline: true })
+            .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+
+    } catch (error) {
+        console.error('Admin Unlink All Error:', error);
+        await interaction.editReply('❌ An error occurred while unlinking accounts.');
+    }
+}
+
+async function handleClearDB(interaction) {
+    const confirm = interaction.options.getBoolean('confirm');
+    if (!confirm) {
+        return await interaction.reply({ content: '❌ You must set `confirm` to True to execute this command.', ephemeral: true });
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+        // Delete in order of dependencies (though CASCADE should handle it, explicit is safer/clearer)
+        await query('TRUNCATE TABLE achievements CASCADE');
+        await query('TRUNCATE TABLE linked_accounts CASCADE');
+        await query('TRUNCATE TABLE users CASCADE');
+
+        const embed = new EmbedBuilder()
+            .setColor(0xFF0000)
+            .setTitle('⚠️ DATABASE CLEARED')
+            .setDescription('All users, linked accounts, and achievements have been wiped.')
+            .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+
+    } catch (error) {
+        console.error('Clear DB Error:', error);
+        await interaction.editReply('❌ An error occurred while clearing the database.');
     }
 }

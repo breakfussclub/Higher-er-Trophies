@@ -13,9 +13,11 @@ async function openXBLRequest(endpoint) {
     });
 
     if (!response.ok) {
-        const error = await response.text();
-        logger.error(`[Xbox] API error (${response.status}) for ${endpoint}: ${error}`);
-        throw new Error(`OpenXBL API error: ${response.status} - ${error}`);
+        const rawErrorText = await response.text();
+        const errorText = rawErrorText.length > 200 ? rawErrorText.substring(0, 200) + '...' : rawErrorText;
+        logger.error(`[Xbox] API error (${response.status}) for ${endpoint}: ${errorText}`);
+        if (response.status === 401) throw new Error('Unauthorized: Check API key');
+        throw new Error(`OpenXBL API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();

@@ -144,7 +144,14 @@ export default {
       allFields = keptFields;
     }
 
-    embed.addFields(allFields);
+    try {
+      embed.addFields(allFields);
+    } catch (error) {
+      console.error('[Stats] Error adding fields to embed:', error);
+      console.error('[Stats] Invalid Fields:', JSON.stringify(allFields, null, 2));
+      // Fallback: Add a simple error field
+      embed.addFields({ name: '⚠️ Error', value: 'Failed to generate stats display.', inline: false });
+    }
 
     await interaction.editReply({ embeds: [embed] });
   }

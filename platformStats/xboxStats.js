@@ -1,4 +1,4 @@
-import { getXboxProfile, searchGamertag, getXboxAchievements } from '../services/xboxService.js';
+import { getXboxProfile, searchGamertag, getXboxAchievements, getTitleAchievements } from '../services/xboxService.js';
 
 function getReputationDisplay(rep) {
   const repMap = {
@@ -55,32 +55,33 @@ export async function getXboxStats(xboxGamertag) {
     // Fetch recent achievements
     let recentAchievementsDisplay = '';
     try {
-      const achievementsData = await getXboxAchievements(xboxProfile.xuid);
-      // The API usually returns a list of achievements. We need to sort by time unlocked.
-      // Structure might be data.achievements or similar.
-      // Based on OpenXBL, it might return a list of titles with achievements.
-      // Let's assume it returns a list of achievements directly for the player endpoint.
+      const titlesData = await getXboxAchievements(xboxProfile.xuid);
 
-      if (achievementsData && Array.isArray(achievementsData)) {
-        const unlocked = achievementsData
-          .filter(a => a.progressState === 'Achieved')
-          .sort((a, b) => new Date(b.progression.timeUnlocked) - new Date(a.progression.timeUnlocked))
-          .slice(0, 3);
+      if (titlesData && titlesData.titles && titlesData.titles.length > 0) {
+        // Sort by last unlock to get the most recent game
+        const recentTitles = titlesData.titles.sort((a, b) => new Date(b.lastUnlock) - new Date(a.lastUnlock));
+        const lastTitle = recentTitles[0];
 
-        if (unlocked.length > 0) {
-          recentAchievementsDisplay = unlocked.map(a => {
-            const name = a.name || 'Unknown Achievement';
-            const desc = a.description || 'No description';
-            const game = a.titleAssociations?.[0]?.name || 'Unknown Game';
-            return `🏆 **${name}** (${game})\n   └─ ${desc}`;
-          }).join('\n');
+        if (lastTitle) {
+          // Fetch achievements for this title
+          const titleAch = await getTitleAchievements(lastTitle.titleId, xboxProfile.xuid);
+
+          if (titleAch && titleAch.achievements) {
+            const unlocked = titleAch.achievements
+              .filter(a => a.progressState === 'Achieved')
+              .sort((a, b) => new Date(b.progression.timeUnlocked) - new Date(a.progression.timeUnlocked))
+              .slice(0, 3);
+
+            if (unlocked.length > 0) {
+              recentAchievementsDisplay = unlocked.map(a => {
+                const name = a.name || 'Unknown Achievement';
+                const desc = a.description || 'No description';
+                return `🏆 **${name}** (${lastTitle.name})\n   └─ ${desc}`;
+              }).join('\n');
+            }
+          }
         }
-      } else if (achievementsData && achievementsData.titles) {
-        // If it returns titles, we might need to look into the first title
-        // But for now, let's handle the array case or fail gracefully
-        console.log('Xbox achievements returned titles structure, parsing logic might need adjustment if this log appears.');
       }
-
     } catch (err) {
       console.log('Could not fetch Xbox achievements:', err.message);
     }

@@ -65,7 +65,7 @@ export default {
         if (steamStats.fields && steamStats.fields.length > 0) {
           if (steamStats.color) embed.setColor(steamStats.color);
           if (steamStats.author) embed.setAuthor(steamStats.author);
-          if (steamStats.thumbnail) embed.setThumbnail(steamStats.thumbnail);
+          if (steamStats.thumbnail && !embed.data.thumbnail) embed.setThumbnail(steamStats.thumbnail);
           if (steamStats.footer) embed.setFooter(steamStats.footer);
           allFields.push(...steamStats.fields);
         }
@@ -80,11 +80,12 @@ export default {
       try {
         const psnStats = await getPSNStats(userData.psn);
         if (psnStats.fields && psnStats.fields.length > 0) {
-          // Only override color/author if Steam didn't set them
-          if (psnStats.color && allFields.length === 0) embed.setColor(psnStats.color);
-          if (psnStats.author && allFields.length === 0) embed.setAuthor(psnStats.author);
-          if (psnStats.thumbnail && allFields.length === 0) embed.setThumbnail(psnStats.thumbnail);
-          if (psnStats.footer && allFields.length === 0) embed.setFooter(psnStats.footer);
+          // Override if it's the specific requested platform or if no thumbnail set yet
+          const isPriority = platform === 'psn';
+          if (psnStats.color && (allFields.length === 0 || isPriority)) embed.setColor(psnStats.color);
+          if (psnStats.author && (allFields.length === 0 || isPriority)) embed.setAuthor(psnStats.author);
+          if (psnStats.thumbnail && (!embed.data.thumbnail || isPriority)) embed.setThumbnail(psnStats.thumbnail);
+          if (psnStats.footer && (allFields.length === 0 || isPriority)) embed.setFooter(psnStats.footer);
           allFields.push(...psnStats.fields);
         }
       } catch (error) {
@@ -98,11 +99,11 @@ export default {
       try {
         const xboxStats = await getXboxStats(userData.xbox);
         if (xboxStats.fields && xboxStats.fields.length > 0) {
-          // Apply Xbox embed styling if it's the only platform or first platform
-          if (xboxStats.color && allFields.length === 0) embed.setColor(xboxStats.color);
-          if (xboxStats.author && allFields.length === 0) embed.setAuthor(xboxStats.author);
-          if (xboxStats.thumbnail && allFields.length === 0) embed.setThumbnail(xboxStats.thumbnail);
-          if (xboxStats.footer && allFields.length === 0) embed.setFooter(xboxStats.footer);
+          const isPriority = platform === 'xbox';
+          if (xboxStats.color && (allFields.length === 0 || isPriority)) embed.setColor(xboxStats.color);
+          if (xboxStats.author && (allFields.length === 0 || isPriority)) embed.setAuthor(xboxStats.author);
+          if (xboxStats.thumbnail && (!embed.data.thumbnail || isPriority)) embed.setThumbnail(xboxStats.thumbnail);
+          if (xboxStats.footer && (allFields.length === 0 || isPriority)) embed.setFooter(xboxStats.footer);
           allFields.push(...xboxStats.fields);
         }
       } catch (error) {

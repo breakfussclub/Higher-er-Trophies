@@ -133,8 +133,12 @@ export async function getRecentAchievements(xuid) {
         }
 
         // 4. Sort all by timeUnlocked
+        if (allAchievements.length > 0) {
+            logger.info(`[Xbox] Sample achievement structure: ${JSON.stringify(allAchievements[0], null, 2)}`);
+        }
+
         const sorted = allAchievements
-            .filter(a => a.progressState === 'Achieved' || a.achieved === true || a.progression?.achieved === true)
+            .filter(a => a.progressState === 'Achieved' || a.achieved === true || a.progression?.achieved === true || a.timeUnlocked || a.progression?.timeUnlocked)
             .map(a => ({
                 ...a,
                 name: a.name || a.achievementName || 'Unknown Achievement',

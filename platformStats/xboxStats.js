@@ -244,10 +244,10 @@ export async function getXboxStats(xboxGamertag) {
 
     return {
       color: embedColor,
-      thumbnail: xboxProfile.profilePicture?.replace('http://', 'https://'),
+      thumbnail: xboxProfile.profilePicture?.replace('http://', 'https://') + '&w=256&h=256', // Forced HTTPS + Resize
       author: {
         name: `${xboxProfile.gamertag || xboxGamertag} - Xbox Live`,
-        iconURL: xboxProfile.profilePicture?.replace('http://', 'https://'),
+        iconURL: xboxProfile.profilePicture?.replace('http://', 'https://') + '&w=64&h=64', // Forced HTTPS + Resize for icon
         url: `https://www.xbox.com/en-US/play/user/${xboxProfile.gamertag || xboxGamertag}`
       },
       footer: {

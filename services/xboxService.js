@@ -98,3 +98,48 @@ export async function getTitleAchievements(titleId, xuid) {
         return { achievements: [] };
     }
 }
+
+export async function getRecentAchievements(xuid) {
+    try {
+        // 1. Get titles
+        const titlesData = await getXboxAchievements(xuid);
+        if (!titlesData || !titlesData.titles) return [];
+
+        // 2. Sort by last unlock and take top 3
+        const recentTitles = titlesData.titles
+            .sort((a, b) => new Date(b.lastUnlock) - new Date(a.lastUnlock))
+            .slice(0, 3);
+
+        let allAchievements = [];
+
+        // 3. Fetch achievements for these titles
+        for (const title of recentTitles) {
+            const achData = await getTitleAchievements(title.titleId, xuid);
+            if (achData && achData.achievements) {
+                // Add title name to each achievement for display
+                const achievementsWithTitle = achData.achievements.map(a => ({
+                    ...a,
+                    titleAssociations: [{ name: title.name }]
+                }));
+                allAchievements.push(...achievementsWithTitle);
+            }
+        }
+
+        // 4. Sort all by timeUnlocked
+        return allAchievements
+            .filter(a => a.progressState === 'Achieved' || a.achieved === true || a.progression?.achieved === true)
+            .map(a => ({
+                ...a,
+                name: a.name || a.achievementName || 'Unknown Achievement',
+                description: a.description || a.lockedDescription || 'No description'
+            }))
+            .sort((a, b) => {
+                const timeA = new Date(a.progression?.timeUnlocked || a.timeUnlocked || 0);
+                const timeB = new Date(b.progression?.timeUnlocked || b.timeUnlocked || 0);
+                return timeB - timeA;
+            });
+    } catch (error) {
+        logger.error(`[Xbox] Error fetching recent achievements: ${error.message}`);
+        return [];
+    }
+}

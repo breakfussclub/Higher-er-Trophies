@@ -1,4 +1,4 @@
-import { getXboxProfile, searchGamertag, getXboxAchievements, getTitleAchievements } from '../services/xboxService.js';
+import { getXboxProfile, searchGamertag, getXboxAchievements, getTitleAchievements, getRecentAchievements } from '../services/xboxService.js';
 
 function getReputationDisplay(rep) {
   const repMap = {

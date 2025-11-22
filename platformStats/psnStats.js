@@ -1,4 +1,4 @@
-import { getPSNProfile, getPSNUserTitles, getPSNTitleTrophies } from '../services/psnService.js';
+import { getPSNProfile, getPSNUserTitles, getPSNTitleTrophies, getPSNGameTrophies } from '../services/psnService.js';
 
 function getTrophyEmoji(type) {
   const emojis = {
@@ -31,7 +31,7 @@ export async function getPSNStats(onlineIdOrAccountId) {
     const profile = await getPSNProfile(onlineIdOrAccountId);
 
     console.log('=== COMPLETE PROFILE DATA ===');
-    console.log(JSON.stringify(profile, null, 2));
+    // console.log(JSON.stringify(profile, null, 2));
 
     // Validate profile data exists
     if (!profile || !profile.earnedTrophies) {
@@ -56,7 +56,11 @@ export async function getPSNStats(onlineIdOrAccountId) {
         console.log(`Trophies response: ${trophiesResponse ? 'Received' : 'Null'}`);
 
         if (trophiesResponse && trophiesResponse.trophies) {
-          // 4. Filter for earned and sort by date
+          // 4. Fetch static game data for trophy names/descriptions
+          const gameData = await getPSNGameTrophies(lastTitle.npCommunicationId);
+          const trophyMap = new Map(gameData?.trophies?.map(t => [t.trophyId, t]) || []);
+
+          // 5. Filter for earned and sort by date
           const earned = trophiesResponse.trophies
             .filter(t => t.earned)
             .sort((a, b) => new Date(b.earnedDateTime) - new Date(a.earnedDateTime))
@@ -66,9 +70,10 @@ export async function getPSNStats(onlineIdOrAccountId) {
 
           if (earned.length > 0) {
             recentTrophiesDisplay = earned.map(t => {
+              const staticData = trophyMap.get(t.trophyId);
               const emoji = getTrophyEmoji(t.trophyType);
-              const name = t.trophyName || 'Unknown Trophy';
-              const desc = t.trophyDetail || 'No description';
+              const name = staticData?.trophyName || t.trophyName || 'Unknown Trophy';
+              const desc = staticData?.trophyDetail || t.trophyDetail || 'No description';
               return `${emoji} **${name}** (${lastTitle.trophyTitleName})\n   └─ ${desc}`;
             }).join('\n');
           }

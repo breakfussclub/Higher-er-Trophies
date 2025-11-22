@@ -103,12 +103,17 @@ export async function getRecentAchievements(xuid) {
     try {
         // 1. Get titles
         const titlesData = await getXboxAchievements(xuid);
-        if (!titlesData || !titlesData.titles) return [];
+        if (!titlesData || !titlesData.titles) {
+            logger.warn('[Xbox] No titles found for recent achievements');
+            return [];
+        }
 
-        // 2. Sort by last unlock and take top 3
+        // 2. Sort by last unlock and take top 5 (increased from 3 to find more candidates)
         const recentTitles = titlesData.titles
-            .sort((a, b) => new Date(b.lastUnlock) - new Date(a.lastUnlock))
-            .slice(0, 3);
+            .sort((a, b) => new Date(b.lastUnlock || 0) - new Date(a.lastUnlock || 0))
+            .slice(0, 5);
+
+        logger.info(`[Xbox] Checking recent achievements for top ${recentTitles.length} titles`);
 
         let allAchievements = [];
 
@@ -122,11 +127,13 @@ export async function getRecentAchievements(xuid) {
                     titleAssociations: [{ name: title.name }]
                 }));
                 allAchievements.push(...achievementsWithTitle);
+            } else {
+                logger.warn(`[Xbox] No achievements found for title ${title.name} (${title.titleId})`);
             }
         }
 
         // 4. Sort all by timeUnlocked
-        return allAchievements
+        const sorted = allAchievements
             .filter(a => a.progressState === 'Achieved' || a.achieved === true || a.progression?.achieved === true)
             .map(a => ({
                 ...a,
@@ -138,6 +145,9 @@ export async function getRecentAchievements(xuid) {
                 const timeB = new Date(b.progression?.timeUnlocked || b.timeUnlocked || 0);
                 return timeB - timeA;
             });
+
+        logger.info(`[Xbox] Found ${sorted.length} recent achievements`);
+        return sorted;
     } catch (error) {
         logger.error(`[Xbox] Error fetching recent achievements: ${error.message}`);
         return [];

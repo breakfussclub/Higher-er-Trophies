@@ -36,9 +36,9 @@ export default {
 
     const userData = {};
     result.rows.forEach(row => {
-      if (row.platform === 'steam') userData.steam = row.account_id;
-      if (row.platform === 'psn') userData.psn = row.account_id;
-      if (row.platform === 'xbox') userData.xbox = row.account_id;
+      if (row.platform === 'steam') userData.steam = row;
+      if (row.platform === 'psn') userData.psn = row;
+      if (row.platform === 'xbox') userData.xbox = row;
     });
 
     if (!userData.steam && !userData.psn && !userData.xbox) {
@@ -61,7 +61,9 @@ export default {
     // Fetch Steam stats
     if ((platform === 'all' || platform === 'steam') && userData.steam) {
       try {
-        const steamStats = await getSteamStats(userData.steam);
+        // Use SteamID64 from extra_data if available, otherwise fallback to account_id (username)
+        const steamId = userData.steam.extra_data?.steamId64 || userData.steam.account_id;
+        const steamStats = await getSteamStats(steamId);
         if (steamStats.fields && steamStats.fields.length > 0) {
           if (steamStats.color) embed.setColor(steamStats.color);
           if (steamStats.author) embed.setAuthor(steamStats.author);
@@ -78,7 +80,7 @@ export default {
     // Fetch PSN stats
     if ((platform === 'all' || platform === 'psn') && userData.psn) {
       try {
-        const psnStats = await getPSNStats(userData.psn);
+        const psnStats = await getPSNStats(userData.psn.account_id);
         if (psnStats.fields && psnStats.fields.length > 0) {
           // Override if it's the specific requested platform or if no thumbnail set yet
           const isPriority = platform === 'psn';
@@ -102,7 +104,7 @@ export default {
     // Fetch Xbox stats
     if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
       try {
-        const xboxStats = await getXboxStats(userData.xbox);
+        const xboxStats = await getXboxStats(userData.xbox.account_id);
         if (xboxStats.fields && xboxStats.fields.length > 0) {
           const isPriority = platform === 'xbox';
           if (xboxStats.color && (allFields.length === 0 || isPriority)) embed.setColor(xboxStats.color);

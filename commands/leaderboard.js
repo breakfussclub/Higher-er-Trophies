@@ -14,14 +14,12 @@ export default {
                 .setColor(0xFFD700) // Gold
                 .setTitle('🏆 Higher-er Learning Leaderboard')
                 .setDescription('Top players across all platforms.')
-                .setThumbnail('attachment://trophy_icon.png')
                 .setTimestamp();
 
             await generateLeaderboard(embed, 10); // Show top 10 per platform
 
             await interaction.editReply({
-                embeds: [embed],
-                files: ['./assets/trophy_icon.png']
+                embeds: [embed]
             });
 
         } catch (error) {

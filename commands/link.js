@@ -1,8 +1,8 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { query } from '../database/db.js';
-import { resolveVanityUrl, getSteamProfile } from '../services/steamService.js';
+import { resolveVanityUrl, getSteamProfile, getSteamLevel } from '../services/steamService.js';
 import { getPSNAccountId, getPSNProfile } from '../services/psnService.js';
-import { searchGamertag } from '../services/xboxService.js';
+import { searchGamertag, getXboxProfile } from '../services/xboxService.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -37,32 +37,53 @@ export default {
       // ===== STEAM =====
       if (platform === 'steam') {
         try {
-          const profile = await getSteamProfile(username);
-          accountId = username;
+          let steamId = username;
+          // Try to resolve if it looks like a vanity URL or just a name
+          if (!/^\d{17}$/.test(username)) {
+             try {
+               steamId = await resolveVanityUrl(username);
+             } catch (e) {
+               // If resolution fails, we'll try using it as is, but it likely won't work if it's not an ID
+             }
+          }
+
+          const profile = await getSteamProfile(steamId);
+          accountId = username; // Keep input as accountId or use steamId? Usually steamId64 is better for uniqueness.
+          // Let's use the resolved steamId as the unique identifier if possible, but the DB schema uses account_id.
+          // Existing code used username as accountId. Let's stick to that to avoid breaking existing links, 
+          // but storing steamId64 in extraData is crucial.
+          
           displayName = profile.personaname;
           extraData.steamId64 = profile.steamid;
-        } catch {
-          try {
-            accountId = await resolveVanityUrl(username);
-            const profile = await getSteamProfile(accountId);
-            displayName = profile.personaname;
-            extraData.steamId64 = profile.steamid;
-          } catch {
+          extraData.avatarUrl = profile.avatarfull;
+
+          // Fetch Level
+          const levelData = await getSteamLevel(profile.steamid);
+          extraData.steamLevel = levelData?.player_level || 0;
+
+        } catch (error) {
+            console.error('Steam Link Error:', error);
             return await interaction.editReply({
-              content: '❌ Could not find Steam account. Please provide either your SteamID64 or custom URL name.',
+              content: '❌ Could not find Steam account. Please provide a valid SteamID64 or Custom URL.',
               ephemeral: true
             });
-          }
         }
       }
 
       // ===== PSN =====
       if (platform === 'psn') {
         try {
+          // getPSNProfile handles "me", numeric IDs, and Online IDs
           const profile = await getPSNProfile(username);
+          
           accountId = profile.onlineId;
           displayName = profile.onlineId;
+          
           extraData.accountId = profile.accountId;
+          extraData.trophyLevel = profile.trophyLevel;
+          extraData.earnedTrophies = profile.earnedTrophies;
+          extraData.avatarUrl = profile.avatarUrl;
+
         } catch (error) {
           let errorMsg = `❌ Could not link PSN account.\n\n**Error:** ${error.message}\n`;
           return await interaction.editReply({ content: errorMsg, ephemeral: true });
@@ -72,9 +93,15 @@ export default {
       // ===== XBOX =====
       if (platform === 'xbox') {
         try {
-          const searchResult = await searchGamertag(username);
-          displayName = searchResult.gamertag || username;
-          extraData.xuid = searchResult.xuid;
+          // Use getXboxProfile to get full stats including Gamerscore
+          const profile = await getXboxProfile(username);
+          
+          displayName = profile.gamertag;
+          extraData.xuid = profile.xuid;
+          extraData.gamerscore = profile.gamerscore;
+          extraData.accountTier = profile.accountTier;
+          extraData.profilePicture = profile.profilePicture;
+
         } catch (error) {
           return await interaction.editReply({
             content: `❌ Could not find Xbox gamertag "${username}". Please check the spelling.`,
@@ -110,7 +137,7 @@ export default {
           { name: 'Platform', value: platform.toUpperCase(), inline: true },
           { name: 'Username', value: displayName, inline: true }
         )
-        .setFooter({ text: 'Use /stats to view your gaming stats!' })
+        .setFooter({ text: 'Stats have been fetched and you are now on the leaderboard!' })
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed], ephemeral: true });

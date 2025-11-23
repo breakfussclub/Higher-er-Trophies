@@ -58,31 +58,63 @@ export async function postDailyDigest(client) {
             }
 
             // Build the embed fields
-            for (const [username, games] of Object.entries(userStats)) {
-                let userField = '';
+            let totalChars = 0;
+            // Estimate initial size (Title + Desc + Footer + Timestamp)
+            totalChars += (embed.data.title?.length || 0) + (embed.data.description?.length || 0) + (embed.data.footer?.text?.length || 0) + 50;
 
-                for (const [gameName, achievements] of Object.entries(games)) {
+            for (const [username, games] of Object.entries(userStats)) {
+                if (totalChars > 5500) {
+                    embed.setDescription(embed.data.description + '\n\n*(Some activity omitted due to size limits)*');
+                    break;
+                }
+
+                let userField = '';
+                const gameEntries = Object.entries(games);
+                // Sort games by activity count (descending) and take top 3
+                const sortedGames = gameEntries.sort((a, b) => b[1].length - a[1].length).slice(0, 3);
+                const hiddenGamesCount = gameEntries.length - sortedGames.length;
+
+                for (const [gameName, achievements] of sortedGames) {
                     const count = achievements.length;
                     const shown = achievements.slice(0, 5); // Show max 5 per game
                     const remaining = count - 5;
 
-                    userField += `**${gameName}** (${count} new)\n`;
-
+                    let gameBlock = `**${gameName}** (${count} new)\n`;
                     shown.forEach(ach => {
-                        userField += `> 🏆 **${ach.name}**\n`;
+                        gameBlock += `> 🏆 **${ach.name}**\n`;
                     });
-
                     if (remaining > 0) {
-                        userField += `> ...and ${remaining} more.\n`;
+                        gameBlock += `> ...and ${remaining} more.\n`;
                     }
-                    userField += '\n';
+                    gameBlock += '\n';
+
+                    // Check if adding this game block exceeds field limit (1024)
+                    if ((userField.length + gameBlock.length) > 1000) {
+                        userField += `*(...and more in ${gameName})*\n`;
+                        break;
+                    }
+                    userField += gameBlock;
                 }
 
-                embed.addFields({
-                    name: `🎮 ${username}'s Activity`,
-                    value: userField.substring(0, 1024), // Discord limit
-                    inline: false
-                });
+                if (hiddenGamesCount > 0) {
+                    userField += `*...and activity in ${hiddenGamesCount} other game(s).*`;
+                }
+
+                const fieldName = `🎮 ${username}'s Activity`;
+                const fieldVal = userField.substring(0, 1024);
+
+                // Check total size before adding
+                if ((totalChars + fieldName.length + fieldVal.length) < 5900) {
+                    embed.addFields({
+                        name: fieldName,
+                        value: fieldVal,
+                        inline: false
+                    });
+                    totalChars += fieldName.length + fieldVal.length;
+                } else {
+                    embed.setDescription(embed.data.description + '\n\n*(Some activity omitted due to size limits)*');
+                    break;
+                }
             }
 
         } else {

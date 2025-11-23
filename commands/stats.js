@@ -15,18 +15,17 @@ export default {
     .addStringOption(option =>
       option.setName('platform')
         .setDescription('Platform to view stats for')
-        .setRequired(false)
+        .setRequired(true)
         .addChoices(
           { name: 'Steam', value: 'steam' },
           { name: 'PlayStation Network', value: 'psn' },
-          { name: 'Xbox Live', value: 'xbox' },
-          { name: 'All Platforms', value: 'all' }
+          { name: 'Xbox Live', value: 'xbox' }
         )),
   async execute(interaction) {
     await interaction.deferReply();
 
     const targetUser = interaction.options.getUser('user') || interaction.user;
-    const platform = interaction.options.getString('platform') || 'all';
+    const platform = interaction.options.getString('platform');
 
     // Fetch linked accounts from database
     const result = await query(
@@ -41,9 +40,9 @@ export default {
       if (row.platform === 'xbox') userData.xbox = row;
     });
 
-    if (!userData.steam && !userData.psn && !userData.xbox) {
+    if (!userData[platform]) {
       return await interaction.editReply({
-        content: `❌ ${targetUser.username} has no linked gaming accounts. Use /link to link accounts.`
+        content: `❌ ${targetUser.username} has not linked a **${platform.toUpperCase()}** account.`
       });
     }
 
@@ -59,7 +58,7 @@ export default {
     let errorMessages = [];
 
     // Fetch Steam stats
-    if ((platform === 'all' || platform === 'steam') && userData.steam) {
+    if (platform === 'steam') {
       try {
         // Use SteamID64 from extra_data if available, otherwise fallback to account_id (username)
         const steamId = userData.steam.extra_data?.steamId64 || userData.steam.account_id;
@@ -67,7 +66,7 @@ export default {
         if (steamStats.fields && steamStats.fields.length > 0) {
           if (steamStats.color) embed.setColor(steamStats.color);
           if (steamStats.author) embed.setAuthor(steamStats.author);
-          if (steamStats.thumbnail && !embed.data.thumbnail) embed.setThumbnail(steamStats.thumbnail);
+          if (steamStats.thumbnail) embed.setThumbnail(steamStats.thumbnail);
           if (steamStats.footer) embed.setFooter(steamStats.footer);
           allFields.push(...steamStats.fields);
         }
@@ -78,21 +77,14 @@ export default {
     }
 
     // Fetch PSN stats
-    if ((platform === 'all' || platform === 'psn') && userData.psn) {
+    if (platform === 'psn') {
       try {
         const psnStats = await getPSNStats(userData.psn.account_id);
         if (psnStats.fields && psnStats.fields.length > 0) {
-          // Override if it's the specific requested platform or if no thumbnail set yet
-          const isPriority = platform === 'psn';
-          if (psnStats.color && (allFields.length === 0 || isPriority)) embed.setColor(psnStats.color);
-          if (psnStats.author && (allFields.length === 0 || isPriority)) embed.setAuthor(psnStats.author);
-          if (psnStats.thumbnail && (!embed.data.thumbnail || isPriority)) {
-            console.log(`[Stats] Setting PSN thumbnail: ${psnStats.thumbnail}`);
-            embed.setThumbnail(psnStats.thumbnail);
-          } else {
-            console.log(`[Stats] Skipped PSN thumbnail. HasThumbnail: ${!!psnStats.thumbnail}, HasEmbedThumb: ${!!embed.data.thumbnail}, IsPriority: ${isPriority}`);
-          }
-          if (psnStats.footer && (allFields.length === 0 || isPriority)) embed.setFooter(psnStats.footer);
+          if (psnStats.color) embed.setColor(psnStats.color);
+          if (psnStats.author) embed.setAuthor(psnStats.author);
+          if (psnStats.thumbnail) embed.setThumbnail(psnStats.thumbnail);
+          if (psnStats.footer) embed.setFooter(psnStats.footer);
           allFields.push(...psnStats.fields);
         }
       } catch (error) {
@@ -102,16 +94,14 @@ export default {
     }
 
     // Fetch Xbox stats
-    if ((platform === 'all' || platform === 'xbox') && userData.xbox) {
+    if (platform === 'xbox') {
       try {
         const xboxStats = await getXboxStats(userData.xbox.account_id);
         if (xboxStats.fields && xboxStats.fields.length > 0) {
-          const isPriority = platform === 'xbox';
-          if (xboxStats.color && (allFields.length === 0 || isPriority)) embed.setColor(xboxStats.color);
-          if (xboxStats.author && (allFields.length === 0 || isPriority)) embed.setAuthor(xboxStats.author);
-          if (xboxStats.author && (allFields.length === 0 || isPriority)) embed.setAuthor(xboxStats.author);
-          if (xboxStats.thumbnail && (!embed.data.thumbnail || isPriority)) embed.setThumbnail(xboxStats.thumbnail);
-          if (xboxStats.footer && (allFields.length === 0 || isPriority)) embed.setFooter(xboxStats.footer);
+          if (xboxStats.color) embed.setColor(xboxStats.color);
+          if (xboxStats.author) embed.setAuthor(xboxStats.author);
+          if (xboxStats.thumbnail) embed.setThumbnail(xboxStats.thumbnail);
+          if (xboxStats.footer) embed.setFooter(xboxStats.footer);
           allFields.push(...xboxStats.fields);
         }
       } catch (error) {

@@ -111,8 +111,7 @@ export async function generateLeaderboard(embed, limit = 10) {
             const rank = (i + 1).toString().padEnd(2);
             const name = u.username.padEnd(maxNameLen);
             const level = `Lvl ${u.level}`.padEnd(7);
-            const plats = `${u.plats} Plats`;
-            return `${rank}. ${name}  ${level}  ${plats}`;
+            return `${rank}. ${name}  ${level}`;
         }).join('\n');
         psnField += '\n```';
     }

@@ -26,8 +26,8 @@ export async function postDailyDigest(client) {
                    a.achievement_name, a.description, a.game_name, a.icon_url
             FROM achievements a
             JOIN linked_accounts u ON a.discord_id = u.discord_id AND a.platform = u.platform
-            WHERE a.detected_at > NOW() - INTERVAL '24 hours'
-            ORDER BY u.username, a.game_name, a.detected_at DESC
+            WHERE a.unlocked_at > NOW() - INTERVAL '24 hours'
+            ORDER BY u.username, a.game_name, a.unlocked_at DESC
         `);
 
         const embed = new EmbedBuilder()

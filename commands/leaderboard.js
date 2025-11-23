@@ -27,7 +27,7 @@ export default {
     }
 };
 
-async function generateUnifiedLeaderboard(embed) {
+export async function generateUnifiedLeaderboard(embed, limit = 15) {
     const { rows } = await query(`
         SELECT u.discord_id, 
                json_object_agg(la.platform, la.extra_data) as accounts,
@@ -72,7 +72,7 @@ async function generateUnifiedLeaderboard(embed) {
         };
     }).sort((a, b) => b.score - a.score);
 
-    const top = ranked.slice(0, 15); // Show top 15
+    const top = ranked.slice(0, limit);
 
     if (top.length === 0) {
         embed.setDescription('No accounts linked yet. Use `/link` to join the leaderboard!');

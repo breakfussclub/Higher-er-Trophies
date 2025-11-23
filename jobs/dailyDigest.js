@@ -2,7 +2,7 @@ import { EmbedBuilder } from 'discord.js';
 import config from '../config.js';
 import logger from '../utils/logger.js';
 import { query } from '../database/db.js';
-import { generateUnifiedLeaderboard } from '../commands/leaderboard.js';
+import { generateLeaderboard } from '../commands/leaderboard.js';
 
 export async function postDailyDigest(client) {
     logger.info('📰 Preparing Daily Digest...');
@@ -93,8 +93,8 @@ export async function postDailyDigest(client) {
             });
         }
 
-        // 2. Global Leaderboard
-        await generateUnifiedLeaderboard(embed, 5); // Show top 5 for digest
+        // 2. Leaderboard Snapshot
+        await generateLeaderboard(embed, 3); // Show top 3 per platform for digest
 
         await channel.send({ embeds: [embed] });
         logger.info('✅ Daily Digest posted successfully.');

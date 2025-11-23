@@ -12,13 +12,17 @@ export default {
         try {
             const embed = new EmbedBuilder()
                 .setColor(0xFFD700) // Gold
-                .setTitle('🏆 Global Leaderboard')
-                .setDescription('Top players across all platforms (Xbox, PSN, Steam)')
+                .setTitle('🏆 Higher-er Learning Leaderboard')
+                .setDescription('Top players across all platforms.')
+                .setThumbnail('attachment://leaderboard_icon.png')
                 .setTimestamp();
 
-            await generateUnifiedLeaderboard(embed);
+            await generateLeaderboard(embed, 10); // Show top 10 per platform
 
-            await interaction.editReply({ embeds: [embed] });
+            await interaction.editReply({
+                embeds: [embed],
+                files: ['./assets/leaderboard_icon.png']
+            });
 
         } catch (error) {
             console.error('Leaderboard error:', error);
@@ -27,7 +31,8 @@ export default {
     }
 };
 
-export async function generateUnifiedLeaderboard(embed, limit = 15) {
+export async function generateLeaderboard(embed, limit = 5) {
+    // Fetch all data
     const { rows } = await query(`
         SELECT u.discord_id, 
                json_object_agg(la.platform, la.extra_data) as accounts,
@@ -37,66 +42,73 @@ export async function generateUnifiedLeaderboard(embed, limit = 15) {
         GROUP BY u.discord_id
     `);
 
-    // Calculate Total Score
-    const ranked = rows.map(user => {
-        const accounts = user.accounts || {};
-        let totalScore = 0;
+    // --- XBOX (Gamerscore) ---
+    const xboxRanked = rows
+        .filter(r => r.accounts.xbox)
+        .map(r => ({
+            username: r.username,
+            score: parseInt(r.accounts.xbox.gamerscore || 0)
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
 
-        // Xbox: 1 Gamerscore = 1 Point
-        if (accounts.xbox) {
-            totalScore += parseInt(accounts.xbox.gamerscore || 0);
-        }
-
-        // PSN: Platinum=300, Gold=90, Silver=30, Bronze=15
-        if (accounts.psn && accounts.psn.earnedTrophies) {
-            const t = accounts.psn.earnedTrophies;
-            totalScore += (t.platinum || 0) * 300;
-            totalScore += (t.gold || 0) * 90;
-            totalScore += (t.silver || 0) * 30;
-            totalScore += (t.bronze || 0) * 15;
-        }
-
-        // Steam: Level * 500
-        if (accounts.steam) {
-            totalScore += (parseInt(accounts.steam.steamLevel || 0) * 500);
-        }
-
-        return {
-            username: user.username || 'Unknown',
-            score: totalScore,
-            breakdown: {
-                xbox: accounts.xbox ? parseInt(accounts.xbox.gamerscore || 0) : 0,
-                psn: accounts.psn ? (accounts.psn.trophyLevel || 0) : 0,
-                steam: accounts.steam ? (accounts.steam.steamLevel || 0) : 0
-            }
-        };
-    }).sort((a, b) => b.score - a.score);
-
-    const top = ranked.slice(0, limit);
-
-    if (top.length === 0) {
-        embed.setDescription('No accounts linked yet. Use `/link` to join the leaderboard!');
-        return;
+    let xboxField = 'No data yet.';
+    if (xboxRanked.length > 0) {
+        xboxField = xboxRanked.map((u, i) => {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
+            return `${medal} **${u.username}** — ${u.score.toLocaleString()} Ⓖ`;
+        }).join('\n');
     }
 
-    const leaderboardList = top.map((user, index) => {
-        let medal = `**${index + 1}.**`;
-        if (index === 0) medal = '🥇';
-        if (index === 1) medal = '🥈';
-        if (index === 2) medal = '🥉';
+    // --- PLAYSTATION (Trophies) ---
+    const psnRanked = rows
+        .filter(r => r.accounts.psn)
+        .map(r => {
+            const t = r.accounts.psn.earnedTrophies;
+            const total = (t?.platinum || 0) + (t?.gold || 0) + (t?.silver || 0) + (t?.bronze || 0);
+            return {
+                username: r.username,
+                level: r.accounts.psn.trophyLevel || 0,
+                plats: t?.platinum || 0,
+                total: total
+            };
+        })
+        .sort((a, b) => {
+            if (b.level !== a.level) return b.level - a.level;
+            return b.total - a.total;
+        })
+        .slice(0, limit);
 
-        const xb = user.breakdown.xbox > 0 ? `XB: ${user.breakdown.xbox.toLocaleString()}` : '';
-        const ps = user.breakdown.psn > 0 ? `PS Lvl: ${user.breakdown.psn}` : '';
-        const st = user.breakdown.steam > 0 ? `Steam Lvl: ${user.breakdown.steam}` : '';
+    let psnField = 'No data yet.';
+    if (psnRanked.length > 0) {
+        psnField = psnRanked.map((u, i) => {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
+            return `${medal} **${u.username}** — Lvl ${u.level} (${u.plats} 🏆)`;
+        }).join('\n');
+    }
 
-        const breakdownParts = [xb, ps, st].filter(p => p !== '').join(' • ');
-        const breakdownDisplay = breakdownParts ? `\n      └─ ${breakdownParts}` : '';
+    // --- STEAM (Level) ---
+    const steamRanked = rows
+        .filter(r => r.accounts.steam)
+        .map(r => ({
+            username: r.username,
+            level: parseInt(r.accounts.steam.steamLevel || 0)
+        }))
+        .sort((a, b) => b.level - a.level)
+        .slice(0, limit);
 
-        return `${medal} **${user.username}** — **${user.score.toLocaleString()}** pts${breakdownDisplay}`;
-    }).join('\n\n');
+    let steamField = 'No data yet.';
+    if (steamRanked.length > 0) {
+        steamField = steamRanked.map((u, i) => {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
+            return `${medal} **${u.username}** — Lvl ${u.level}`;
+        }).join('\n');
+    }
 
-    embed.addFields({ name: '\u200b', value: leaderboardList, inline: false });
-
-    // Add legend footer
-    embed.setFooter({ text: 'Points: 1 Gamerscore = 1 pt • PSN Trophies (Plat=300, Gold=90...) • Steam Level * 500' });
+    // Add fields to embed
+    embed.addFields(
+        { name: '🟢 Xbox Live', value: xboxField, inline: false },
+        { name: '🔵 PlayStation Network', value: psnField, inline: false },
+        { name: '☁️ Steam', value: steamField, inline: false }
+    );
 }

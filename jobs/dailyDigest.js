@@ -129,8 +129,20 @@ export async function postDailyDigest(client) {
 
             if (randomAch.length > 0) {
                 const ach = randomAch[0];
+
+                const spotlightIntros = [
+                    "It's been a quiet day for trophies, but let's take a moment to appreciate this gem from the archives!",
+                    "The trophy gods are resting today. Instead, let's look back at this epic moment!",
+                    "No new shiny things today? No problem! Here's a blast from the past.",
+                    "Everyone's taking a break! So here's a random achievement to inspire you.",
+                    "Silence on the achievement front... but do you remember when this happened?",
+                    "Slow day? Maybe. But this achievement is still pretty cool.",
+                    "Nothing new to report today, so let's celebrate this classic unlock instead!"
+                ];
+                const randomIntro = spotlightIntros[Math.floor(Math.random() * spotlightIntros.length)];
+
                 embed.setTitle('🏆 Achievement Spotlight')
-                    .setDescription('No new achievements in the last 24h, but check this out!')
+                    .setDescription(randomIntro)
                     .addFields(
                         { name: 'Game', value: ach.game_name || 'Unknown Game', inline: true },
                         { name: 'Earned By', value: `${ach.username} (${ach.platform.toUpperCase()})`, inline: true },

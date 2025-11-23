@@ -14,14 +14,14 @@ export default {
                 .setColor(0xFFD700) // Gold
                 .setTitle('🏆 Higher-er Learning Leaderboard')
                 .setDescription('Top players across all platforms.')
-                .setThumbnail('attachment://leaderboard_icon.png')
+                .setThumbnail('attachment://trophy_icon.png')
                 .setTimestamp();
 
             await generateLeaderboard(embed, 10); // Show top 10 per platform
 
             await interaction.editReply({
                 embeds: [embed],
-                files: ['./assets/leaderboard_icon.png']
+                files: ['./assets/trophy_icon.png']
             });
 
         } catch (error) {
@@ -31,7 +31,7 @@ export default {
     }
 };
 
-export async function generateLeaderboard(embed, limit = 5) {
+export async function generateLeaderboard(embed, limit = 10) {
     // Fetch all data
     const { rows } = await query(`
         SELECT u.discord_id, 
@@ -42,37 +42,63 @@ export async function generateLeaderboard(embed, limit = 5) {
         GROUP BY u.discord_id
     `);
 
+    // Helper to safely parse extra_data
+    const getAccountData = (user, platform) => {
+        if (!user.accounts || !user.accounts[platform]) return null;
+        let data = user.accounts[platform];
+        if (typeof data === 'string') {
+            try {
+                data = JSON.parse(data);
+            } catch (e) {
+                return null;
+            }
+        }
+        return data;
+    };
+
     // --- XBOX (Gamerscore) ---
     const xboxRanked = rows
-        .filter(r => r.accounts.xbox)
-        .map(r => ({
-            username: r.username,
-            score: parseInt(r.accounts.xbox.gamerscore || 0)
-        }))
+        .map(r => {
+            const data = getAccountData(r, 'xbox');
+            if (!data) return null;
+            return {
+                username: r.username,
+                score: parseInt(data.gamerscore || 0)
+            };
+        })
+        .filter(r => r !== null)
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
 
     let xboxField = 'No data yet.';
     if (xboxRanked.length > 0) {
-        xboxField = xboxRanked.map((u, i) => {
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
-            return `${medal} **${u.username}** — ${u.score.toLocaleString()} Ⓖ`;
+        // Calculate padding
+        const maxNameLen = Math.max(...xboxRanked.map(u => u.username.length));
+        xboxField = '```\n';
+        xboxField += xboxRanked.map((u, i) => {
+            const rank = (i + 1).toString().padEnd(2);
+            const name = u.username.padEnd(maxNameLen);
+            const score = u.score.toLocaleString().padStart(7);
+            return `${rank}. ${name}  ${score} G`;
         }).join('\n');
+        xboxField += '\n```';
     }
 
     // --- PLAYSTATION (Trophies) ---
     const psnRanked = rows
-        .filter(r => r.accounts.psn)
         .map(r => {
-            const t = r.accounts.psn.earnedTrophies;
+            const data = getAccountData(r, 'psn');
+            if (!data) return null;
+            const t = data.earnedTrophies;
             const total = (t?.platinum || 0) + (t?.gold || 0) + (t?.silver || 0) + (t?.bronze || 0);
             return {
                 username: r.username,
-                level: r.accounts.psn.trophyLevel || 0,
+                level: data.trophyLevel || 0,
                 plats: t?.platinum || 0,
                 total: total
             };
         })
+        .filter(r => r !== null)
         .sort((a, b) => {
             if (b.level !== a.level) return b.level - a.level;
             return b.total - a.total;
@@ -81,28 +107,43 @@ export async function generateLeaderboard(embed, limit = 5) {
 
     let psnField = 'No data yet.';
     if (psnRanked.length > 0) {
-        psnField = psnRanked.map((u, i) => {
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
-            return `${medal} **${u.username}** — Lvl ${u.level} (${u.plats} 🏆)`;
+        const maxNameLen = Math.max(...psnRanked.map(u => u.username.length));
+        psnField = '```\n';
+        psnField += psnRanked.map((u, i) => {
+            const rank = (i + 1).toString().padEnd(2);
+            const name = u.username.padEnd(maxNameLen);
+            const level = `Lvl ${u.level}`.padEnd(7);
+            const plats = `${u.plats} Plats`;
+            return `${rank}. ${name}  ${level}  ${plats}`;
         }).join('\n');
+        psnField += '\n```';
     }
 
     // --- STEAM (Level) ---
     const steamRanked = rows
-        .filter(r => r.accounts.steam)
-        .map(r => ({
-            username: r.username,
-            level: parseInt(r.accounts.steam.steamLevel || 0)
-        }))
+        .map(r => {
+            const data = getAccountData(r, 'steam');
+            if (!data) return null;
+            return {
+                username: r.username,
+                level: parseInt(data.steamLevel || 0)
+            };
+        })
+        .filter(r => r !== null)
         .sort((a, b) => b.level - a.level)
         .slice(0, limit);
 
     let steamField = 'No data yet.';
     if (steamRanked.length > 0) {
-        steamField = steamRanked.map((u, i) => {
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
-            return `${medal} **${u.username}** — Lvl ${u.level}`;
+        const maxNameLen = Math.max(...steamRanked.map(u => u.username.length));
+        steamField = '```\n';
+        steamField += steamRanked.map((u, i) => {
+            const rank = (i + 1).toString().padEnd(2);
+            const name = u.username.padEnd(maxNameLen);
+            const level = `Lvl ${u.level}`;
+            return `${rank}. ${name}  ${level}`;
         }).join('\n');
+        steamField += '\n```';
     }
 
     // Add fields to embed

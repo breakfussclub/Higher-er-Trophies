@@ -8,10 +8,6 @@ export default {
   data: new SlashCommandBuilder()
     .setName('stats')
     .setDescription('View gaming statistics')
-    .addUserOption(option =>
-      option.setName('user')
-        .setDescription('User to view stats for (defaults to you)')
-        .setRequired(false))
     .addStringOption(option =>
       option.setName('platform')
         .setDescription('Platform to view stats for')
@@ -20,7 +16,11 @@ export default {
           { name: 'Steam', value: 'steam' },
           { name: 'PlayStation Network', value: 'psn' },
           { name: 'Xbox Live', value: 'xbox' }
-        )),
+        ))
+    .addUserOption(option =>
+      option.setName('user')
+        .setDescription('User to view stats for (defaults to you)')
+        .setRequired(false)),
   async execute(interaction) {
     await interaction.deferReply();
 

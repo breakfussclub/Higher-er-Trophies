@@ -3,6 +3,8 @@ import { query } from '../database/db.js';
 import { resolveVanityUrl, getSteamProfile, getSteamLevel } from '../services/steamService.js';
 import { getPSNAccountId, getPSNProfile } from '../services/psnService.js';
 import { searchGamertag, getXboxProfile } from '../services/xboxService.js';
+import { checkSteam, checkPSN, checkXbox } from '../jobs/syncAchievements.js';
+import logger from '../utils/logger.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -40,11 +42,11 @@ export default {
           let steamId = username;
           // Try to resolve if it looks like a vanity URL or just a name
           if (!/^\d{17}$/.test(username)) {
-             try {
-               steamId = await resolveVanityUrl(username);
-             } catch (e) {
-               // If resolution fails, we'll try using it as is, but it likely won't work if it's not an ID
-             }
+            try {
+              steamId = await resolveVanityUrl(username);
+            } catch (e) {
+              // If resolution fails, we'll try using it as is, but it likely won't work if it's not an ID
+            }
           }
 
           const profile = await getSteamProfile(steamId);
@@ -52,7 +54,7 @@ export default {
           // Let's use the resolved steamId as the unique identifier if possible, but the DB schema uses account_id.
           // Existing code used username as accountId. Let's stick to that to avoid breaking existing links, 
           // but storing steamId64 in extraData is crucial.
-          
+
           displayName = profile.personaname;
           extraData.steamId64 = profile.steamid;
           extraData.avatarUrl = profile.avatarfull;
@@ -62,11 +64,11 @@ export default {
           extraData.steamLevel = levelData?.player_level || 0;
 
         } catch (error) {
-            console.error('Steam Link Error:', error);
-            return await interaction.editReply({
-              content: '❌ Could not find Steam account. Please provide a valid SteamID64 or Custom URL.',
-              ephemeral: true
-            });
+          console.error('Steam Link Error:', error);
+          return await interaction.editReply({
+            content: '❌ Could not find Steam account. Please provide a valid SteamID64 or Custom URL.',
+            ephemeral: true
+          });
         }
       }
 
@@ -75,10 +77,10 @@ export default {
         try {
           // getPSNProfile handles "me", numeric IDs, and Online IDs
           const profile = await getPSNProfile(username);
-          
+
           accountId = profile.onlineId;
           displayName = profile.onlineId;
-          
+
           extraData.accountId = profile.accountId;
           extraData.trophyLevel = profile.trophyLevel;
           extraData.earnedTrophies = profile.earnedTrophies;
@@ -95,7 +97,7 @@ export default {
         try {
           // Use getXboxProfile to get full stats including Gamerscore
           const profile = await getXboxProfile(username);
-          
+
           displayName = profile.gamertag;
           extraData.xuid = profile.xuid;
           extraData.gamerscore = profile.gamerscore;
@@ -137,10 +139,25 @@ export default {
           { name: 'Platform', value: platform.toUpperCase(), inline: true },
           { name: 'Username', value: displayName, inline: true }
         )
-        .setFooter({ text: 'Stats have been fetched and you are now on the leaderboard!' })
+        .setFooter({ text: 'Stats have been fetched and you are now on the leaderboard! Syncing recent history...' })
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed], ephemeral: true });
+
+      // 3. Trigger Initial Sync
+      logger.info(`[Link] Triggering initial sync for ${userId} on ${platform}...`);
+      try {
+        if (platform === 'steam') {
+          await checkSteam(userId, { accountId, extraData });
+        } else if (platform === 'psn') {
+          await checkPSN(userId, { accountId, extraData });
+        } else if (platform === 'xbox') {
+          await checkXbox(userId, { accountId, extraData });
+        }
+        logger.info(`[Link] Initial sync completed for ${userId} on ${platform}`);
+      } catch (syncError) {
+        logger.error(`[Link] Initial sync failed for ${userId} on ${platform}: ${syncError.message}`);
+      }
 
     } catch (error) {
       console.error('Error linking account:', error);

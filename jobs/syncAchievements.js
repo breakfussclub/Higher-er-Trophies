@@ -90,7 +90,7 @@ async function logAchievement(discordId, platform, gameId, achievementId, unlock
 /**
  * Check Steam Achievements
  */
-async function checkSteam(discordId, steamAccount) {
+export async function checkSteam(discordId, steamAccount) {
     const newAchievements = [];
     const steamId = steamAccount.extraData?.steamId64 || steamAccount.accountId;
     let totalAchievements = steamAccount.extraData?.totalAchievements || 0;
@@ -99,9 +99,9 @@ async function checkSteam(discordId, steamAccount) {
         const games = await SteamService.getSteamGames(steamId);
         if (!games.games) return [];
 
-        // Check top 5 recently played or most played
+        // Check top 5 recently played (using rtime_last_played)
         const topGames = games.games
-            .sort((a, b) => b.playtime_forever - a.playtime_forever)
+            .sort((a, b) => b.rtime_last_played - a.rtime_last_played)
             .slice(0, 5);
 
         for (const game of topGames) {
@@ -178,7 +178,7 @@ async function checkSteam(discordId, steamAccount) {
 /**
  * Check PSN Trophies
  */
-async function checkPSN(discordId, psnAccount) {
+export async function checkPSN(discordId, psnAccount) {
     const newTrophies = [];
     const accountId = psnAccount.extraData?.accountId || psnAccount.accountId;
 
@@ -253,7 +253,7 @@ async function checkPSN(discordId, psnAccount) {
 /**
  * Check Xbox Achievements
  */
-async function checkXbox(discordId, xboxAccount) {
+export async function checkXbox(discordId, xboxAccount) {
     const newAchievements = [];
     const xuid = xboxAccount.extraData?.xuid;
 

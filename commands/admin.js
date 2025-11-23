@@ -3,6 +3,7 @@ import { query } from '../database/db.js';
 import { resolveVanityUrl, getSteamProfile } from '../services/steamService.js';
 import { getPSNAccountId, getPSNProfile } from '../services/psnService.js';
 import { searchGamertag } from '../services/xboxService.js';
+import { postDailyDigest } from '../jobs/dailyDigest.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -62,7 +63,11 @@ export default {
                 .addBooleanOption(option =>
                     option.setName('confirm')
                         .setDescription('You must set this to True to execute')
-                        .setRequired(true))),
+                        .setRequired(true)))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('digest')
+                .setDescription('Manually trigger the Daily Digest post')),
 
     async execute(interaction) {
         const subcommand = interaction.options.getSubcommand();
@@ -75,6 +80,8 @@ export default {
             await handleAdminUnlinkAll(interaction);
         } else if (subcommand === 'clear-db') {
             await handleClearDB(interaction);
+        } else if (subcommand === 'digest') {
+            await handleDigest(interaction);
         }
     }
 };
@@ -279,5 +286,16 @@ async function handleClearDB(interaction) {
     } catch (error) {
         console.error('Clear DB Error:', error);
         await interaction.editReply('❌ An error occurred while clearing the database.');
+    }
+}
+
+async function handleDigest(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+    try {
+        await postDailyDigest(interaction.client);
+        await interaction.editReply('✅ Manually triggered Daily Digest.');
+    } catch (error) {
+        console.error('Manual Digest Error:', error);
+        await interaction.editReply('❌ Failed to trigger Daily Digest.');
     }
 }

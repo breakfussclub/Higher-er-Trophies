@@ -86,11 +86,36 @@ export async function postDailyDigest(client) {
             }
 
         } else {
-            embed.addFields({
-                name: '🔥 Yesterday\'s Activity',
-                value: 'No achievements unlocked yesterday. Time to get gaming!',
-                inline: false
-            });
+            // Fallback: Achievement Spotlight
+            const { rows: randomAch } = await query(`
+                SELECT a.achievement_name, a.description, a.game_name, a.icon_url, u.username, a.platform
+                FROM achievements a
+                JOIN linked_accounts u ON a.discord_id = u.discord_id AND a.platform = u.platform
+                ORDER BY RANDOM()
+                LIMIT 1
+            `);
+
+            if (randomAch.length > 0) {
+                const ach = randomAch[0];
+                embed.setTitle('🏆 Achievement Spotlight')
+                    .setDescription('No new achievements in the last 24h, but check this out!')
+                    .addFields(
+                        { name: 'Game', value: ach.game_name || 'Unknown Game', inline: true },
+                        { name: 'Earned By', value: `${ach.username} (${ach.platform.toUpperCase()})`, inline: true },
+                        { name: '\u200b', value: '\u200b', inline: true }, // Spacer
+                        { name: `🏅 ${ach.achievement_name}`, value: ach.description || 'No description', inline: false }
+                    );
+
+                if (ach.icon_url) {
+                    embed.setThumbnail(ach.icon_url);
+                }
+            } else {
+                embed.addFields({
+                    name: '🔥 Yesterday\'s Activity',
+                    value: 'No achievements unlocked yesterday. Time to get gaming!',
+                    inline: false
+                });
+            }
         }
 
         // 2. Leaderboard Snapshot

@@ -71,7 +71,7 @@ export default {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('backlog-sync')
-                .setDescription('⚠️ DANGER: Delete all channels and kick all members for a clean slate')
+                .setDescription('Syncs all platforms and users at once. Not recommended.')
                 .addBooleanOption(option =>
                     option.setName('confirm')
                         .setDescription('You must set this to True to execute')

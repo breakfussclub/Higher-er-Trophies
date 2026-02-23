@@ -10,7 +10,6 @@ export default {
     data: new SlashCommandBuilder()
         .setName('admin')
         .setDescription('Administrative commands')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .addSubcommand(subcommand =>
             subcommand
                 .setName('link')
@@ -71,7 +70,7 @@ export default {
                 .setDescription('Manually trigger the Daily Digest post'))
         .addSubcommand(subcommand =>
             subcommand
-                .setName('wipe-server')
+                .setName('backlog-sync')
                 .setDescription('⚠️ DANGER: Delete all channels and kick all members for a clean slate')
                 .addBooleanOption(option =>
                     option.setName('confirm')
@@ -99,7 +98,7 @@ export default {
             await handleClearDB(interaction);
         } else if (subcommand === 'digest') {
             await handleDigest(interaction);
-        } else if (subcommand === 'wipe-server') {
+        } else if (subcommand === 'backlog-sync') {
             await handleWipeServer(interaction);
         }
     }

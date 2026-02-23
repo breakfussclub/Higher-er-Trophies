@@ -126,19 +126,9 @@ async function handleWipeServer(interaction) {
     const guild = interaction.guild;
     const results = { channelsDeleted: 0, channelsFailed: 0, membersRemoved: 0, membersFailed: 0 };
 
-    // --- Delete all channels ---
-    const channels = [...guild.channels.cache.values()];
-    for (const channel of channels) {
-        try {
-            await channel.delete('Server wipe initiated by admin');
-            results.channelsDeleted++;
-        } catch (err) {
-            // Some channels may be undeletable (e.g. the last channel in certain configs)
-            results.channelsFailed++;
-        }
-    }
-
-    // --- Kick or ban all members except the bot itself and the command invoker ---
+    // --- Kick/ban members FIRST before deleting channels ---
+    // (Deleting channels can disrupt the interaction context)
+    logger.info('[WipeServer] Starting member removal phase...');
     const members = await guild.members.fetch({ force: true });
     logger.info(`[WipeServer] Total members fetched: ${members.size}`);
 
@@ -175,6 +165,21 @@ async function handleWipeServer(interaction) {
             results.membersFailed++;
         }
     }
+
+    // --- Delete all channels AFTER members have been removed ---
+    logger.info('[WipeServer] Starting channel deletion phase...');
+    const channels = [...guild.channels.cache.values()];
+    for (const channel of channels) {
+        try {
+            await channel.delete('Server wipe initiated by admin');
+            results.channelsDeleted++;
+            logger.info(`[WipeServer] Deleted channel: ${channel.name}`);
+        } catch (err) {
+            logger.warn(`[WipeServer] Failed to delete channel ${channel.name}: ${err.message}`);
+            results.channelsFailed++;
+        }
+    }
+    logger.info(`[WipeServer] Channel deletion complete. Deleted: ${results.channelsDeleted}, Failed: ${results.channelsFailed}`);
 
     // Attempt to follow up in DMs since all channels are gone
     try {

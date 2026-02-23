@@ -17,7 +17,8 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers  // Required for guild.members.fetch()
   ]
 });
 
@@ -67,7 +68,7 @@ const rest = new REST({ version: '10' }).setToken(config.discord.token);
 })();
 
 // Event: Bot ready
-client.once('ready', () => {
+client.once('clientReady', () => {
   logger.info(`${client.user.tag} is online and ready!`);
   logger.info(`Serving ${client.guilds.cache.size} server(s)`);
 

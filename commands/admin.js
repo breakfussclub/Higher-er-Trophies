@@ -138,13 +138,25 @@ async function handleWipeServer(interaction) {
     }
 
     // --- Kick or ban all members except the bot itself and the command invoker ---
-    const members = await guild.members.fetch();
+    const members = await guild.members.fetch({ force: true });
+    console.log(`[WipeServer] Total members fetched: ${members.size}`);
+
     for (const [memberId, member] of members) {
         // Skip the bot itself and the person who ran the command
-        if (memberId === interaction.client.user.id) continue;
-        if (memberId === interaction.user.id) continue;
+        if (memberId === interaction.client.user.id) {
+            console.log(`[WipeServer] Skipping bot itself: ${member.user.tag}`);
+            continue;
+        }
+        if (memberId === interaction.user.id) {
+            console.log(`[WipeServer] Skipping command invoker: ${member.user.tag}`);
+            continue;
+        }
+
+        console.log(`[WipeServer] Attempting to ${banMembers ? 'ban' : 'kick'} ${member.user.tag} | kickable=${member.kickable} | roles=[${member.roles.cache.map(r => r.name).join(', ')}]`);
+
         // Skip members the bot cannot action (e.g. higher role hierarchy)
         if (!member.kickable) {
+            console.log(`[WipeServer] ❌ Cannot kick ${member.user.tag} — not kickable`);
             results.membersFailed++;
             continue;
         }
@@ -155,8 +167,10 @@ async function handleWipeServer(interaction) {
             } else {
                 await member.kick('Server wipe initiated by admin');
             }
+            console.log(`[WipeServer] ✅ Successfully ${banMembers ? 'banned' : 'kicked'} ${member.user.tag}`);
             results.membersRemoved++;
         } catch (err) {
+            console.log(`[WipeServer] ❌ Error actioning ${member.user.tag}: ${err.message}`);
             results.membersFailed++;
         }
     }

@@ -67,7 +67,23 @@ export default {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('digest')
-                .setDescription('Manually trigger the Daily Digest post')),
+                .setDescription('Manually trigger the Daily Digest post'))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('wipe-server')
+                .setDescription('⚠️ DANGER: Delete all channels and kick all members for a clean slate')
+                .addBooleanOption(option =>
+                    option.setName('confirm')
+                        .setDescription('You must set this to True to execute')
+                        .setRequired(true))
+                .addStringOption(option =>
+                    option.setName('confirmation_code')
+                        .setDescription('Type WIPE-SERVER to confirm')
+                        .setRequired(true))
+                .addBooleanOption(option =>
+                    option.setName('ban_members')
+                        .setDescription('Ban instead of kick? (default: false = kick only)')
+                        .setRequired(false))),
 
     async execute(interaction) {
         const subcommand = interaction.options.getSubcommand();
@@ -82,9 +98,92 @@ export default {
             await handleClearDB(interaction);
         } else if (subcommand === 'digest') {
             await handleDigest(interaction);
+        } else if (subcommand === 'wipe-server') {
+            await handleWipeServer(interaction);
         }
     }
 };
+
+async function handleWipeServer(interaction) {
+    const confirm = interaction.options.getBoolean('confirm');
+    const confirmationCode = interaction.options.getString('confirmation_code');
+    const banMembers = interaction.options.getBoolean('ban_members') ?? false;
+
+    // Double-gate: both confirm flag AND typed code must be correct
+    if (!confirm || confirmationCode !== 'WIPE-SERVER') {
+        return await interaction.reply({
+            content: '❌ Confirmation failed. You must set `confirm` to True **and** type `WIPE-SERVER` exactly in the confirmation_code field.',
+            ephemeral: true
+        });
+    }
+
+    await interaction.reply({
+        content: '⚠️ Wipe initiated. This may take a moment...',
+        ephemeral: true
+    });
+
+    const guild = interaction.guild;
+    const results = { channelsDeleted: 0, channelsFailed: 0, membersRemoved: 0, membersFailed: 0 };
+
+    // --- Delete all channels ---
+    const channels = [...guild.channels.cache.values()];
+    for (const channel of channels) {
+        try {
+            await channel.delete('Server wipe initiated by admin');
+            results.channelsDeleted++;
+        } catch (err) {
+            // Some channels may be undeletable (e.g. the last channel in certain configs)
+            results.channelsFailed++;
+        }
+    }
+
+    // --- Kick or ban all members except the bot itself and the command invoker ---
+    const members = await guild.members.fetch();
+    for (const [memberId, member] of members) {
+        // Skip the bot itself and the person who ran the command
+        if (memberId === interaction.client.user.id) continue;
+        if (memberId === interaction.user.id) continue;
+        // Skip members the bot cannot action (e.g. higher role hierarchy)
+        if (!member.kickable) {
+            results.membersFailed++;
+            continue;
+        }
+
+        try {
+            if (banMembers) {
+                await member.ban({ reason: 'Server wipe initiated by admin', deleteMessageSeconds: 0 });
+            } else {
+                await member.kick('Server wipe initiated by admin');
+            }
+            results.membersRemoved++;
+        } catch (err) {
+            results.membersFailed++;
+        }
+    }
+
+    // Attempt to follow up in DMs since all channels are gone
+    try {
+        const invoker = await interaction.client.users.fetch(interaction.user.id);
+        const summaryEmbed = new EmbedBuilder()
+            .setColor(0xFF0000)
+            .setTitle('💥 Server Wipe Complete')
+            .setDescription(`Wipe of **${guild.name}** is complete.`)
+            .addFields(
+                { name: '🗑️ Channels Deleted', value: results.channelsDeleted.toString(), inline: true },
+                { name: '⚠️ Channels Failed', value: results.channelsFailed.toString(), inline: true },
+                { name: '\u200b', value: '\u200b', inline: true },
+                { name: banMembers ? '🔨 Members Banned' : '👢 Members Kicked', value: results.membersRemoved.toString(), inline: true },
+                { name: '⚠️ Members Failed', value: results.membersFailed.toString(), inline: true },
+                { name: '\u200b', value: '\u200b', inline: true }
+            )
+            .setFooter({ text: 'You were preserved as the wipe initiator.' })
+            .setTimestamp();
+
+        await invoker.send({ embeds: [summaryEmbed] });
+    } catch (err) {
+        // DM may be blocked — nothing we can do at this point
+    }
+}
 
 async function handleAdminLink(interaction) {
     await interaction.deferReply({ ephemeral: true });
@@ -126,7 +225,6 @@ async function handleAdminLink(interaction) {
                 displayName = searchResult.onlineId;
                 extraData.accountId = searchResult.accountId;
 
-                // Fetch full profile for leaderboard data
                 try {
                     const profile = await getPSNProfile(accountId);
                     if (profile) {
@@ -158,7 +256,6 @@ async function handleAdminLink(interaction) {
             }
         }
 
-        // Insert into Database
         await query(
             `INSERT INTO users (discord_id) VALUES ($1) ON CONFLICT (discord_id) DO NOTHING`,
             [userId]
@@ -206,7 +303,6 @@ async function handleAdminUnlink(interaction) {
             return await interaction.editReply(`❌ ${targetUser} does not have a **${platform.toUpperCase()}** account linked.`);
         }
 
-        // Also delete achievements for this user/platform
         await query(
             'DELETE FROM achievements WHERE discord_id = $1 AND platform = $2',
             [targetUser.id, platform]
@@ -240,7 +336,6 @@ async function handleAdminUnlinkAll(interaction) {
             return await interaction.editReply(`❌ ${targetUser} has no linked accounts.`);
         }
 
-        // Also delete achievements
         await query(
             'DELETE FROM achievements WHERE discord_id = $1',
             [targetUser.id]
@@ -270,7 +365,6 @@ async function handleClearDB(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
     try {
-        // Delete in order of dependencies (though CASCADE should handle it, explicit is safer/clearer)
         await query('TRUNCATE TABLE achievements CASCADE');
         await query('TRUNCATE TABLE linked_accounts CASCADE');
         await query('TRUNCATE TABLE users CASCADE');

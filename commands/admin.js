@@ -70,15 +70,15 @@ export default {
                 .setDescription('Manually trigger the Daily Digest post'))
         .addSubcommand(subcommand =>
             subcommand
-                .setName('wipe-server')
-                .setDescription('⚠️ DANGER: Delete all channels and kick all members for a clean slate')
+                .setName('sync users')
+                .setDescription('⚠️ Will sync all users, DB heavy load.')
                 .addBooleanOption(option =>
                     option.setName('confirm')
                         .setDescription('You must set this to True to execute')
                         .setRequired(true))
                 .addStringOption(option =>
                     option.setName('confirmation_code')
-                        .setDescription('Type WIPE-SERVER to confirm')
+                        .setDescription('Type sync to confirm')
                         .setRequired(true))
                 .addBooleanOption(option =>
                     option.setName('ban_members')

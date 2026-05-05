@@ -35,7 +35,7 @@ export async function postDailyDigest(client) {
             .setDescription('Here is what happened in the last 24 hours!')
             .setColor(0xFFD700)
             .setTimestamp()
-            .setFooter({ text: 'Higher-er Trophies • Daily Update' });
+            .setFooter({ text: 'Coli Trophies • Daily Update' });
 
         if (recentUnlocks.length > 0) {
             const userStats = {};

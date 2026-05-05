@@ -12,7 +12,7 @@ export default {
         try {
             const embed = new EmbedBuilder()
                 .setColor(0xFFD700) // Gold
-                .setTitle('🏆 Higher-er Learning Leaderboard')
+                .setTitle('🏆 Coli Trophies Leaderboard')
                 .setDescription('Top players across all platforms.')
                 .setTimestamp();
 
